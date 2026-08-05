@@ -68,6 +68,7 @@ class MainActivity : ComponentActivity() {
             val nowPlaying  by vm.nowPlaying.collectAsStateWithLifecycle()
             val weather     by vm.weather.collectAsStateWithLifecycle()
             val location    by vm.location.collectAsStateWithLifecycle()
+            val obdStatus   by vm.obdStatus.collectAsStateWithLifecycle()
             val bearing     by vm.compassBearing.collectAsStateWithLifecycle()
             val isWifi      by vm.isWifi.collectAsStateWithLifecycle()
             val isData      by vm.isData.collectAsStateWithLifecycle()
@@ -251,10 +252,12 @@ class MainActivity : ComponentActivity() {
                                     )
 
                                     NavDestination.SETTINGS -> SettingsScreen(
-                                        settings = settings,
-                                        accent   = accent,
-                                        onUpdate = { block -> vm.updateSettings(block) },
-                                        onReset  = { vm.resetSettings() }
+                                        settings  = settings,
+                                        accent    = accent,
+                                        onUpdate  = { block -> vm.updateSettings(block) },
+                                        onReset   = { vm.resetSettings() },
+                                        obdStatus = obdStatus,
+                                        pairedObdAdapters = { vm.pairedObdAdapters() }
                                     )
                                 }
                             }
