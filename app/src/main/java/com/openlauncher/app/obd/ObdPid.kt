@@ -37,7 +37,14 @@ enum class ObdPid(
     /** volts */
     MODULE_VOLTAGE("42", 2, { ((it[0] * 256) + it[1]) / 1000f }),
     /** °C */
-    OIL_TEMP("5C", 1, { it[0] - 40f });
+    OIL_TEMP("5C", 1, { it[0] - 40f }),
+    /**
+     * litres/hour, metered by the ECU itself. Where it is supported this is the
+     * only trustworthy consumption source on a diesel, which runs lean and at a
+     * varying air/fuel ratio — deriving fuel from MAF assumes a fixed
+     * stoichiometric mixture and does not hold there.
+     */
+    ENGINE_FUEL_RATE("5E", 2, { ((it[0] * 256) + it[1]) / 20f });
 
     /** Mode 01 request line, e.g. "010C" for engine RPM. */
     val command: String get() = "01$pid"

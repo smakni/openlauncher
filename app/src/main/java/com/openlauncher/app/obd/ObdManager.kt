@@ -139,7 +139,10 @@ class ObdManager(context: Context) {
             fuelLevelPct  = readings[ObdPid.FUEL_LEVEL]            ?: previous.fuelLevelPct,
             batteryVolts  = readings[ObdPid.MODULE_VOLTAGE]        ?: previous.batteryVolts,
             boostBar      = manifoldKpa?.let { (it - barometricKpa) / KPA_PER_BAR } ?: previous.boostBar,
-            consumptionLph = readings[ObdPid.MAF]?.let { consumptionFrom(it, fuelType) }
+            // The ECU's own fuel rate wins whenever the car reports it; the MAF
+            // estimate is only a fallback for cars that do not support PID 5E.
+            consumptionLph = readings[ObdPid.ENGINE_FUEL_RATE]
+                ?: readings[ObdPid.MAF]?.let { consumptionFrom(it, fuelType) }
                 ?: previous.consumptionLph
         )
     }
@@ -147,12 +150,16 @@ class ObdManager(context: Context) {
     /**
      * Air mass flow to fuel volume per hour:
      *
-     *     litres/h = MAF(g/s) x 3600 / (stoichiometric ratio x fuel density g/l)
+     *     litres/h = MAF(g/s) x 3600 / (air-fuel ratio x fuel density g/l)
      *
-     * This assumes the engine is running closed-loop at its stoichiometric ratio,
-     * which holds while cruising but overstates consumption under hard
-     * acceleration, when the ECU enriches the mixture. It is a live gauge, not a
-     * basis for fuel economy figures.
+     * A fallback for cars that do not report PID 5E, and a coarse one. It assumes
+     * a fixed stoichiometric mixture: roughly true of a petrol engine while
+     * cruising, overstated under hard acceleration when the ECU enriches.
+     *
+     * On a diesel it is weaker still — the engine always runs lean, at a ratio
+     * that swings from around 18:1 under load to beyond 80:1 at idle, and the ECU
+     * meters fuel rather than air. Treat the diesel figure as an indicator of
+     * direction, not a measurement, and prefer PID 5E wherever the car offers it.
      */
     private fun consumptionFrom(mafGramsPerSecond: Float, fuelType: FuelType): Float =
         mafGramsPerSecond * SECONDS_PER_HOUR /
@@ -191,7 +198,8 @@ class ObdManager(context: Context) {
         )
         val SLOW_GROUP = listOf(
             ObdPid.COOLANT_TEMP, ObdPid.INTAKE_TEMP, ObdPid.OIL_TEMP, ObdPid.ENGINE_LOAD,
-            ObdPid.FUEL_LEVEL, ObdPid.MODULE_VOLTAGE, ObdPid.MAF, ObdPid.BAROMETRIC
+            ObdPid.FUEL_LEVEL, ObdPid.MODULE_VOLTAGE, ObdPid.ENGINE_FUEL_RATE,
+            ObdPid.MAF, ObdPid.BAROMETRIC
         )
         const val SLOW_EVERY       = 10
         const val POLL_INTERVAL_MS = 100L
