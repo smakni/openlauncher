@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.openlauncher.app.model.FuelType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -59,6 +60,10 @@ class SettingsRepository(private val context: Context) {
         val SPEEDOMETER_DIGITAL_ONLY = booleanPreferencesKey("speedometer_digital_only")
         val GRADIENT_DIRECTION    = stringPreferencesKey("gradient_direction")
         val USE_CUSTOM_BG_COLOR   = booleanPreferencesKey("use_custom_bg_color")
+        val OBD_ENABLED           = booleanPreferencesKey("obd_enabled")
+        val OBD_DEVICE_MAC        = stringPreferencesKey("obd_device_mac")
+        val OBD_DEVICE_NAME       = stringPreferencesKey("obd_device_name")
+        val FUEL_TYPE             = stringPreferencesKey("fuel_type")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -134,7 +139,11 @@ class SettingsRepository(private val context: Context) {
                 vitalsAsBars     = prefs[Keys.VITALS_AS_BARS] ?: defaults.vitalsAsBars,
                 speedometerDigitalOnly = prefs[Keys.SPEEDOMETER_DIGITAL_ONLY] ?: defaults.speedometerDigitalOnly,
                 gradientDirection = prefs[Keys.GRADIENT_DIRECTION]?.let { runCatching { GradientDirection.valueOf(it) }.getOrNull() } ?: defaults.gradientDirection,
-                useCustomBackgroundColor = prefs[Keys.USE_CUSTOM_BG_COLOR] ?: defaults.useCustomBackgroundColor
+                useCustomBackgroundColor = prefs[Keys.USE_CUSTOM_BG_COLOR] ?: defaults.useCustomBackgroundColor,
+                obdEnabled       = prefs[Keys.OBD_ENABLED]     ?: defaults.obdEnabled,
+                obdDeviceMac     = prefs[Keys.OBD_DEVICE_MAC]  ?: defaults.obdDeviceMac,
+                obdDeviceName    = prefs[Keys.OBD_DEVICE_NAME] ?: defaults.obdDeviceName,
+                fuelType         = prefs[Keys.FUEL_TYPE]?.let { runCatching { FuelType.valueOf(it) }.getOrNull() } ?: defaults.fuelType
             )
     }
 
@@ -191,6 +200,10 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SPEEDOMETER_DIGITAL_ONLY] = s.speedometerDigitalOnly
             prefs[Keys.GRADIENT_DIRECTION] = s.gradientDirection.name
             prefs[Keys.USE_CUSTOM_BG_COLOR] = s.useCustomBackgroundColor
+            prefs[Keys.OBD_ENABLED]        = s.obdEnabled
+            prefs[Keys.OBD_DEVICE_MAC]     = s.obdDeviceMac
+            prefs[Keys.OBD_DEVICE_NAME]    = s.obdDeviceName
+            prefs[Keys.FUEL_TYPE]          = s.fuelType.name
     }
 
     suspend fun resetToDefaults() {

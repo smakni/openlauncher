@@ -28,7 +28,10 @@ import com.openlauncher.app.util.SunriseSunset
 import com.openlauncher.app.model.AppInfo
 import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.model.NowPlayingState
+import com.openlauncher.app.model.ObdStatus
+import com.openlauncher.app.model.VehicleState
 import com.openlauncher.app.model.WeatherState
+import com.openlauncher.app.obd.ObdManager
 import com.openlauncher.app.service.MediaListenerService
 import com.openlauncher.app.util.LocationCompassManager
 import com.openlauncher.app.util.LocationData
@@ -39,6 +42,21 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     private val settingsRepo = SettingsRepository(application)
     private val locationMgr  = LocationCompassManager(application)
+    private val obdMgr       = ObdManager(application)
+
+    // ── OBD-II ────────────────────────────────────────────────────────────────
+    val vehicle:   StateFlow<VehicleState> = obdMgr.vehicle
+    val obdStatus: StateFlow<ObdStatus>    = obdMgr.status
+
+    /**
+     * Paired adapters as (MAC, display name). Reading a device name needs
+     * BLUETOOTH_CONNECT, so this returns empty rather than throwing when the
+     * permission has not been granted yet — settings then shows an empty list
+     * instead of the picker crashing.
+     */
+    fun pairedObdAdapters(): List<Pair<String, String>> = runCatching {
+        obdMgr.bondedAdapters().map { it.address to (it.name ?: it.address) }
+    }.getOrDefault(emptyList())
 
     // ── Settings ──────────────────────────────────────────────────────────────
     private val _settingsLoaded = MutableStateFlow(false)
@@ -646,6 +664,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     override fun onCleared() {
         super.onCleared()
         locationMgr.stop()
+        obdMgr.stop()
         radioObserver?.let { getApplication<Application>().contentResolver.unregisterContentObserver(it) }
         radioObserver = null
     }
@@ -654,6 +673,18 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         loadInstalledApps()
         refreshConnectivity()
         if (hasSzchoicewayMcu) startHardwareRadioObserver()
+
+        // Follow the OBD settings rather than starting the link once: changing the
+        // adapter or the fuel type has to rebuild the connection, and turning the
+        // feature off has to release the socket so the dongle is free for other apps.
+        viewModelScope.launch {
+            settings
+                .map { Triple(it.obdEnabled, it.obdDeviceMac, it.fuelType) }
+                .distinctUntilChanged()
+                .collect { (enabled, mac, fuelType) ->
+                    if (enabled && mac.isNotBlank()) obdMgr.start(mac, fuelType) else obdMgr.stop()
+                }
+        }
         // Fetch weather on first location fix, then every 30 minutes.
         // The minute ticker covers the parked case where no location updates arrive.
         viewModelScope.launch {
