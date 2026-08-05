@@ -215,6 +215,25 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
         )
     }
 
+    // The radio deck mirrors whatever the vendor radio app publishes as a media
+    // session, and parses band and frequency out of its title and artist. A
+    // session is not a declared component, so the only way to know whether one
+    // exists — and what its metadata actually looks like — is to read it here.
+    add("media sessions" to runCatching {
+        val manager = context.getSystemService(android.media.session.MediaSessionManager::class.java)
+        val listener = android.content.ComponentName(
+            context, com.openlauncher.app.service.MediaListenerService::class.java
+        )
+        val sessions = manager.getActiveSessions(listener)
+        if (sessions.isEmpty()) "none active" else sessions.joinToString("\n") { controller ->
+            val md = controller.metadata
+            val title = md?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE).orEmpty()
+            val artist = md?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST).orEmpty()
+            val state = controller.playbackState?.state?.toString() ?: "-"
+            "${controller.packageName}\n  t=${title.take(22)}\n  a=${artist.take(22)}\n  st=$state"
+        }
+    }.getOrElse { "needs notification access" })
+
     add("home app" to runCatching {
         val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
             .addCategory(android.content.Intent.CATEGORY_HOME)
