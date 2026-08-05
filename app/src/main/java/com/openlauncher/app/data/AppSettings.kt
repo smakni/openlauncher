@@ -14,7 +14,9 @@ enum class GradientDirection { TOP_TO_BOTTOM, LEFT_TO_RIGHT, DIAGONAL, RADIAL }
 enum class DefaultShortcutIcon {
     NONE,
     // Navigation & vehicle
-    RADIO, CAMERA, PHONE, MAP, NAVIGATION, CAR, GAS_STATION, DASHBOARD,
+    RADIO, CAMERA, PHONE, MAP, NAVIGATION, CAR, GAS_STATION, DASHBOARD, CARPLAY,
+    // Files
+    FILE_MANAGER,
     // Audio & media
     MUSIC, SPEAKER, HEADSET, EQUALIZER, VOLUME_UP,
     // Connectivity

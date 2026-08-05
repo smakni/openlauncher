@@ -42,8 +42,8 @@ import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.ui.theme.LocalDayMode
 import kotlin.math.roundToInt
 
-private val ICON_SIZE   = 22.dp
-private val SLOT_SIZE   = 52.dp
+private val ICON_SIZE   = 26.dp
+private val SLOT_SIZE   = 62.dp
 
 @Composable
 fun Sidebar(
@@ -159,7 +159,7 @@ fun Sidebar(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .height(56.dp)
+                .height(68.dp)
                 .background(sidebarBg)
         ) {
             // Shortcuts centred, inset past the edge-pinned nav buttons and
@@ -197,7 +197,7 @@ fun Sidebar(
     } else {
         Column(
             modifier = modifier
-                .width(56.dp)
+                .width(68.dp)
                 .fillMaxHeight()
                 .background(sidebarBg),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -529,6 +529,10 @@ fun DefaultShortcutIcon.toIcon(): ImageVector = when (this) {
     DefaultShortcutIcon.CAR         -> Icons.Default.DirectionsCar
     DefaultShortcutIcon.GAS_STATION -> Icons.Default.LocalGasStation
     DefaultShortcutIcon.DASHBOARD   -> Icons.Default.Speed
+    // No CarPlay glyph exists in Material; a phone reads as projection,
+    // and keeps this distinct from CAR which is already a car.
+    DefaultShortcutIcon.CARPLAY     -> Icons.Default.PhoneIphone
+    DefaultShortcutIcon.FILE_MANAGER -> Icons.Default.Folder
     // Audio & media
     DefaultShortcutIcon.MUSIC       -> Icons.Default.MusicNote
     DefaultShortcutIcon.SPEAKER     -> Icons.Default.Speaker

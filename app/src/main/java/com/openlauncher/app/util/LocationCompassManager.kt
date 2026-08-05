@@ -8,6 +8,7 @@ import android.hardware.SensorManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Build
 import android.os.Bundle
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,7 +87,7 @@ class LocationCompassManager(context: Context) {
                 longitude = loc.longitude,
                 altitude  = loc.altitude,
                 accuracy  = loc.accuracy,
-                speedMps  = if (loc.hasSpeed()) loc.speed else 0f
+                speedMps  = standstillCorrected(loc)
             )
 
             // 1. If GPS has a hardware-computed bearing, use it (works offline)
@@ -158,6 +159,28 @@ class LocationCompassManager(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /**
+     * GPS speed with standstill noise removed.
+     *
+     * A receiver parked still reports a metre or so per second of drift, and with
+     * no distance filter on the updates every one of those wandering fixes now
+     * reaches the readout — a stationary car shows a creeping speed.
+     *
+     * Where the chip estimates its own speed accuracy, a reading smaller than
+     * that estimate is indistinguishable from zero and is treated as such. Older
+     * chips that report no accuracy fall back to a fixed floor, set below walking
+     * pace so it cannot mask real movement.
+     */
+    private fun standstillCorrected(loc: Location): Float {
+        if (!loc.hasSpeed()) return 0f
+        val speed = loc.speed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && loc.hasSpeedAccuracy()) {
+            val noiseFloor = loc.speedAccuracyMetersPerSecond
+            if (speed <= noiseFloor) return 0f
+        }
+        return if (speed < STANDSTILL_FLOOR_MPS) 0f else speed
+    }
+
     fun stop() {
         sensorManager.unregisterListener(sensorListener)
         locationManager.removeUpdates(locationListener)
@@ -172,5 +195,8 @@ class LocationCompassManager(context: Context) {
          * once satellites have genuinely dropped out.
          */
         const val GPS_PREFERENCE_WINDOW_MS = 10_000L
+
+        /** ~2.5 km/h — under walking pace, so real movement is never masked. */
+        const val STANDSTILL_FLOOR_MPS = 0.7f
     }
 }

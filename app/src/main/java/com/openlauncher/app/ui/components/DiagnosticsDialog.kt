@@ -173,9 +173,13 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
     // the upstream szchoiceway radio support already reads SYS_MEDIA_INFO_JSON
     // that way. With no provider or bindable interface on this unit's CAN
     // package, this is the remaining place vehicle state could be readable.
-    for ((name, uri) in listOf(
-        "settings.system" to android.provider.Settings.System.CONTENT_URI,
-        "settings.global" to android.provider.Settings.Global.CONTENT_URI
+    // System is listed in full rather than filtered. handbrake_status showed up
+    // there, which proves the CAN decoder publishes into this table — and a
+    // keyword filter would hide any vendor key that happens not to match. The
+    // table is short enough to read whole.
+    for ((name, uri, filtered) in listOf(
+        Triple("settings.system", android.provider.Settings.System.CONTENT_URI, false),
+        Triple("settings.global", android.provider.Settings.Global.CONTENT_URI, true)
     )) {
         val hits = runCatching {
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -185,10 +189,11 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
                 buildList {
                     while (cursor.moveToNext()) {
                         val key = cursor.getString(nameCol) ?: continue
-                        if (VEHICLE_KEY_HINTS.any { key.contains(it, ignoreCase = true) }) {
-                            val value = if (valueCol >= 0) cursor.getString(valueCol) else null
-                            add(if (value.isNullOrEmpty()) key else "$key=${value.take(24)}")
+                        if (filtered && VEHICLE_KEY_HINTS.none { key.contains(it, ignoreCase = true) }) {
+                            continue
                         }
+                        val value = if (valueCol >= 0) cursor.getString(valueCol) else null
+                        add(if (value.isNullOrEmpty()) key else "$key=${value.take(20)}")
                     }
                 }
             }
@@ -196,9 +201,9 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
 
         add(
             name to when {
-                hits == null    -> "not readable"
-                hits.isEmpty()  -> "no matching keys"
-                else            -> hits.take(12).joinToString("\n")
+                hits == null   -> "not readable"
+                hits.isEmpty() -> "no keys"
+                else           -> hits.sorted().joinToString("\n")
             }
         )
     }
