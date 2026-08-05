@@ -13,6 +13,7 @@ import android.provider.Settings as AndroidSettings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.openlauncher.app.data.AppSettings
+import com.openlauncher.app.data.AppTileConfig
 import com.openlauncher.app.data.DayNightMode
 import com.openlauncher.app.data.DefaultShortcutIcon
 import com.openlauncher.app.data.GRID_COLS
@@ -132,7 +133,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ── CarPlay / Android Auto picker ─────────────────────────────────────────
-    enum class AppPickerTarget { CARPLAY, ANDROID_AUTO, PIP, RADIO }
+    enum class AppPickerTarget { CARPLAY, ANDROID_AUTO, PIP, RADIO, APP_TILE }
 
     private val _appPickerTarget = MutableStateFlow<AppPickerTarget?>(null)
     val carPlayPickerActive: StateFlow<Boolean> = MutableStateFlow(false) // kept for compat
@@ -153,6 +154,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         _nav.value = NavDestination.APP_LIBRARY
     }
 
+    // Which tile of the app shortcuts widget the picker is filling. Held apart
+    // from the target enum because the enum identifies the kind of destination
+    // while this identifies which slot of it.
+    private var appTileIndex: Int = 0
+
+    fun startAppTilePicker(index: Int) {
+        appTileIndex = index
+        _appPickerTarget.value = AppPickerTarget.APP_TILE
+        _nav.value = NavDestination.APP_LIBRARY
+    }
+
     fun startRadioPicker() {
         _appPickerTarget.value = AppPickerTarget.RADIO
         _nav.value = NavDestination.APP_LIBRARY
@@ -164,6 +176,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             AppPickerTarget.ANDROID_AUTO -> updateSettings { copy(androidAutoPackage = app.packageName) }
             AppPickerTarget.PIP          -> updateSettings { copy(pipAppPackage = app.packageName) }
             AppPickerTarget.RADIO        -> updateSettings { copy(radioPackage = app.packageName) }
+            AppPickerTarget.APP_TILE     -> updateSettings {
+                copy(appShortcutTiles = appShortcutTiles.mapIndexed { i, tile ->
+                    if (i == appTileIndex) AppTileConfig(app.packageName, app.appName) else tile
+                })
+            }
             null -> {}
         }
         _appPickerTarget.value = null
@@ -237,6 +254,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "VITALS"      -> copy(showVitals = true)
                 "TRIP_TRACKER" -> copy(showTripTracker = true)
                 "SOUNDBOARD"  -> copy(showSoundboard = true)
+                "APP_SHORTCUT_1" -> copy(showAppShortcut1 = true)
+                "APP_SHORTCUT_2" -> copy(showAppShortcut2 = true)
                 else          -> this
             }
             val idx       = layout.indexOfFirst { it.id == id }
@@ -268,6 +287,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "VITALS"      -> copy(showVitals = false)
                 "TRIP_TRACKER" -> copy(showTripTracker = false)
                 "SOUNDBOARD"  -> copy(showSoundboard = false)
+                "APP_SHORTCUT_1" -> copy(showAppShortcut1 = false)
+                "APP_SHORTCUT_2" -> copy(showAppShortcut2 = false)
                 else          -> this
             }
         }

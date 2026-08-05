@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.openlauncher.app.model.AppInfo
 import com.openlauncher.app.ui.theme.LocalDayMode
+import com.openlauncher.app.ui.theme.contrastOn
 
 private enum class AppFilter { USER, SYSTEM, ALL }
 
@@ -112,7 +113,7 @@ fun AppLibraryScreen(
                             },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = accent,
-                                selectedLabelColor     = Color.Black,
+                                selectedLabelColor     = contrastOn(accent),
                                 labelColor             = placeholderC
                             )
                         )

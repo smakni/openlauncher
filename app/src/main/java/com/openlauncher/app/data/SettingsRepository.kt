@@ -64,6 +64,9 @@ class SettingsRepository(private val context: Context) {
         val OBD_DEVICE_MAC        = stringPreferencesKey("obd_device_mac")
         val OBD_DEVICE_NAME       = stringPreferencesKey("obd_device_name")
         val FUEL_TYPE             = stringPreferencesKey("fuel_type")
+        val SHOW_APP_SHORTCUT_1   = booleanPreferencesKey("show_app_shortcut_1")
+        val SHOW_APP_SHORTCUT_2   = booleanPreferencesKey("show_app_shortcut_2")
+        val APP_TILES_JSON        = stringPreferencesKey("app_tiles_json")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -146,7 +149,14 @@ class SettingsRepository(private val context: Context) {
                 obdEnabled       = prefs[Keys.OBD_ENABLED]     ?: defaults.obdEnabled,
                 obdDeviceMac     = prefs[Keys.OBD_DEVICE_MAC]  ?: defaults.obdDeviceMac,
                 obdDeviceName    = prefs[Keys.OBD_DEVICE_NAME] ?: defaults.obdDeviceName,
-                fuelType         = prefs[Keys.FUEL_TYPE]?.let { runCatching { FuelType.valueOf(it) }.getOrNull() } ?: defaults.fuelType
+                fuelType         = prefs[Keys.FUEL_TYPE]?.let { runCatching { FuelType.valueOf(it) }.getOrNull() } ?: defaults.fuelType,
+                showAppShortcut1 = prefs[Keys.SHOW_APP_SHORTCUT_1] ?: defaults.showAppShortcut1,
+                showAppShortcut2 = prefs[Keys.SHOW_APP_SHORTCUT_2] ?: defaults.showAppShortcut2,
+                appShortcutTiles = prefs[Keys.APP_TILES_JSON]?.let {
+                    runCatching {
+                        gson.fromJson<List<AppTileConfig>>(it, object : TypeToken<List<AppTileConfig>>() {}.type)
+                    }.getOrNull()
+                } ?: defaults.appShortcutTiles
             )
     }
 
@@ -207,6 +217,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.OBD_DEVICE_MAC]     = s.obdDeviceMac
             prefs[Keys.OBD_DEVICE_NAME]    = s.obdDeviceName
             prefs[Keys.FUEL_TYPE]          = s.fuelType.name
+            prefs[Keys.SHOW_APP_SHORTCUT_1] = s.showAppShortcut1
+            prefs[Keys.SHOW_APP_SHORTCUT_2] = s.showAppShortcut2
+            prefs[Keys.APP_TILES_JSON]     = gson.toJson(s.appShortcutTiles)
     }
 
     suspend fun resetToDefaults() {

@@ -42,6 +42,20 @@ fun defaultSoundboardPads() = listOf(
     SoundPadConfig("+",            synthType = "")
 )
 
+/**
+ * One app tile inside the app shortcuts widget.
+ *
+ * The label is stored next to the package so the tile can still be named after
+ * an app that has since been uninstalled, rather than going blank.
+ */
+data class AppTileConfig(
+    val packageName: String = "",
+    val label: String = ""
+)
+
+/** One entry per app shortcut widget, indexed by the widget number minus one. */
+fun defaultAppTiles() = List(2) { AppTileConfig() }
+
 data class ShortcutConfig(
     val packageName: String = "",
     val label: String = "",
@@ -114,7 +128,10 @@ data class AppSettings(
     val obdEnabled: Boolean = false,
     val obdDeviceMac: String = "",
     val obdDeviceName: String = "",
-    val fuelType: FuelType = FuelType.PETROL
+    val fuelType: FuelType = FuelType.PETROL,
+    val showAppShortcut1: Boolean = false,
+    val showAppShortcut2: Boolean = false,
+    val appShortcutTiles: List<AppTileConfig> = defaultAppTiles()
 )
 
 fun defaultShortcuts() = listOf(
@@ -149,6 +166,8 @@ fun AppSettings.activeWidgetIds(): Set<String> = buildSet {
     if (showVitals) add("VITALS")
     if (showTripTracker) add("TRIP_TRACKER")
     if (showSoundboard) add("SOUNDBOARD")
+    if (showAppShortcut1) add("APP_SHORTCUT_1")
+    if (showAppShortcut2) add("APP_SHORTCUT_2")
 }
 
 /**

@@ -27,6 +27,7 @@ import com.openlauncher.app.model.NavDestination
 import com.openlauncher.app.ui.components.Sidebar
 import com.openlauncher.app.ui.screen.*
 import com.openlauncher.app.ui.theme.OpenLauncherTheme
+import com.openlauncher.app.ui.theme.accentFor
 import com.openlauncher.app.viewmodel.LauncherViewModel
 
 class MainActivity : ComponentActivity() {
@@ -79,12 +80,15 @@ class MainActivity : ComponentActivity() {
             val pickerSlot      by vm.shortcutPickerSlot.collectAsStateWithLifecycle()
             val appPickerTarget by vm.appPickerTarget.collectAsStateWithLifecycle()
 
-            val accent         = Color(settings.accentColor)
             val bg             = if (settings.useCustomBackgroundColor) {
                 Color(settings.backgroundColor)
             } else {
                 if (isDayMode) Color(0xFFEEEEEE) else Color.Black
             }
+            // Derived from the background rather than used raw: the default accent
+            // is white, which is invisible on the light theme, and everything
+            // tinted with it went with it.
+            val accent         = accentFor(Color(settings.accentColor), bg)
             val textColor      = if (isDayMode) Color(0xFF111111) else Color(settings.fontColor)
             val bgGradientEnd  = Color(settings.gradientEndColor)
             val bgBrush        = if (settings.useCustomBackgroundColor && settings.useGradient) {
@@ -145,8 +149,14 @@ class MainActivity : ComponentActivity() {
                         val layoutDivColor = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1A1A1A)
 
                         val sidebarContent: @Composable () -> Unit = {
+                            // The sidebar used to receive only 35% of the UI scale so it
+                            // would not eat horizontal room. On an ultrawide panel it costs
+                            // around 7% of the width even at maximum, and damping it left
+                            // the bar tiny while everything else grew — which the setting
+                            // describes itself as not doing. Its shortcut list scrolls, so
+                            // full scale cannot push entries out of reach.
                             val sidebarDensity = Density(
-                                density = baseDensity.density * (1.0f + (settings.uiScale - 1.0f) * 0.35f),
+                                density   = baseDensity.density * settings.uiScale,
                                 fontScale = baseDensity.fontScale
                             )
                             CompositionLocalProvider(LocalDensity provides sidebarDensity) {
@@ -190,6 +200,9 @@ class MainActivity : ComponentActivity() {
                             ) { destination ->
                                 when (destination) {
                                     NavDestination.HOME -> HomeScreen(
+                                        installedIconFor    = { pkg -> apps.find { it.packageName == pkg }?.icon },
+                                        onLaunchApp         = { pkg -> vm.launchApp(pkg) },
+                                        onAssignAppTile     = { index -> vm.startAppTilePicker(index) },
                                         settings            = settings,
                                         weather             = weather,
                                         nowPlaying          = nowPlaying,
@@ -243,6 +256,7 @@ class MainActivity : ComponentActivity() {
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.ANDROID_AUTO -> "CHOOSE ANDROID AUTO APP"
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.PIP          -> "CHOOSE PIP APP"
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.RADIO        -> "CHOOSE RADIO APP"
+                                            com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.APP_TILE     -> "CHOOSE APP FOR SHORTCUT"
                                             else -> "CHOOSE CARPLAY APP"
                                         },
                                         accent              = accent,

@@ -42,6 +42,7 @@ import com.openlauncher.app.data.WidgetConfig
 import com.openlauncher.app.model.NowPlayingState
 import com.openlauncher.app.model.WeatherState
 import com.openlauncher.app.ui.theme.LocalDayMode
+import com.openlauncher.app.ui.theme.accentFor
 import com.openlauncher.app.ui.widget.*
 import java.util.Calendar
 import com.openlauncher.app.util.LocationData
@@ -64,7 +65,9 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("SPEEDOMETER", "SPEED",       Icons.Default.Speed,         "GPS speed"),
     WidgetTypeInfo("VITALS",      "VITALS",      Icons.Default.Dns,           "Head Unit Health / Vitals"),
     WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
-    WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads")
+    WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads"),
+    WidgetTypeInfo("APP_SHORTCUT_1", "APP 1",    Icons.Default.Apps,          "Shortcut to an app"),
+    WidgetTypeInfo("APP_SHORTCUT_2", "APP 2",    Icons.Default.Apps,          "Shortcut to an app")
 )
 
 private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boolean {
@@ -78,6 +81,8 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
         if (settings.showVitals) add("VITALS")
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
+        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
+        if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
     val activeWidgets = settings.widgetLayout.filter { it.enabled && it.id in visibleIds }
     val occupied = buildSet<Pair<Int, Int>> {
@@ -133,9 +138,16 @@ fun HomeScreen(
     onRadioSwitchAm: () -> Unit = {},
     onRadioTune: (band: String, freq: Float) -> Unit = { _, _ -> },
     onAssignRadio: () -> Unit = {},
+    installedIconFor: (String) -> android.graphics.drawable.Drawable? = { null },
+    onLaunchApp: (String) -> Unit = {},
+    onAssignAppTile: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val accent       = Color(settings.accentColor)
+    // Corrected against the background here too: this screen builds its own
+    // accent from settings rather than taking the one the activity already
+    // adjusted, so without this the default white accent stays invisible on the
+    // light theme and every icon tinted with it disappears.
+    val accent       = accentFor(Color(settings.accentColor), MaterialTheme.colorScheme.background)
     val gap          = 6.dp
     val hasWallpaper = settings.wallpaperUri.isNotEmpty()
     val widgetBg     = when {
@@ -243,6 +255,8 @@ fun HomeScreen(
                 if (settings.showVitals) add("VITALS")
                 if (settings.showTripTracker) add("TRIP_TRACKER")
                 if (settings.showSoundboard) add("SOUNDBOARD")
+                if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
+                if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
             }
 
             // Keep only visible widgets exactly as configured in settings, allowing explicit resizing to dictate layout
@@ -318,6 +332,10 @@ fun HomeScreen(
                     "SPEEDOMETER" -> "SPEED"
                     "TRIP_TRACKER" -> "TRIP"
                     "SOUNDBOARD"  -> "SOUND"
+                    "APP_SHORTCUT_1" -> settings.appShortcutTiles.getOrNull(0)
+                        ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 1"
+                    "APP_SHORTCUT_2" -> settings.appShortcutTiles.getOrNull(1)
+                        ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 2"
                     else          -> w.id
                 }
 
@@ -474,6 +492,20 @@ fun HomeScreen(
                             onUpdatePad = onUpdateSoundPad,
                             modifier  = Modifier.fillMaxSize()
                         )
+                        "APP_SHORTCUT_1", "APP_SHORTCUT_2" -> {
+                            val tileIndex = if (w.id == "APP_SHORTCUT_1") 0 else 1
+                            AppShortcutWidget(
+                                tile             = settings.appShortcutTiles.getOrNull(tileIndex)
+                                    ?: com.openlauncher.app.data.AppTileConfig(),
+                                accent           = accent,
+                                installedIconFor = installedIconFor,
+                                onLaunch         = onLaunchApp,
+                                onAssign         = { onAssignAppTile(tileIndex) },
+                                isDayMode        = isDayMode,
+                                isEditing        = editMode,
+                                modifier         = Modifier.fillMaxSize()
+                            )
+                        }
                     }
 
                     // Label — hide when album art fills the widget background
@@ -839,6 +871,8 @@ private fun WidgetLibraryDialog(
         if (settings.showVitals) add("VITALS")
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
+        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
+        if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
     val canAdd = canAddWidget(settings)
 
