@@ -1,7 +1,24 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+/**
+ * Build timestamp, carried in both the version name and the copied APK's file
+ * name. Several test builds end up side by side on the way to a head unit, and
+ * without this they are the same size, the same package and the same version —
+ * with no way to tell which one is actually installed.
+ */
+val buildStamp: String = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US)
+    .apply { timeZone = TimeZone.getDefault() }
+    .format(Date())
+
+val baseVersionName = "0.0.5"
 
 android {
     namespace  = "com.openlauncher.app"
@@ -14,7 +31,7 @@ android {
         minSdk         = 21
         targetSdk      = 36
         versionCode    = 6
-        versionName    = "0.0.5"
+        versionName    = "$baseVersionName-$buildStamp"
     }
 
     buildTypes {
@@ -38,6 +55,24 @@ android {
     buildFeatures {
         compose = true
     }
+}
+
+/**
+ * Drops a stamped copy of the debug APK in apk/ after every build.
+ *
+ * The Gradle output keeps its fixed app-debug.apk name, so this is what makes
+ * successive builds distinguishable once they leave the machine. Copying rather
+ * than renaming the variant output avoids the internal AGP APIs that renaming
+ * requires, which change between plugin versions.
+ */
+val copyDebugApk by tasks.registering(Copy::class) {
+    from(layout.buildDirectory.file("outputs/apk/debug/app-debug.apk"))
+    into(rootProject.layout.projectDirectory.dir("apk"))
+    rename { "openlauncher-$buildStamp.apk" }
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(copyDebugApk)
 }
 
 dependencies {

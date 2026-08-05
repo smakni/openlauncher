@@ -94,6 +94,13 @@ private val VEHICLE_KEY_HINTS = listOf(
 
 private fun collectDiagnostics(context: Context): List<Pair<String, String>> = buildList {
     val metrics = context.resources.displayMetrics
+    // First line on purpose: the version name carries the build timestamp, and
+    // this is the only way to confirm which build is actually on the unit —
+    // every APK shares a package name and installs over the last one.
+    add("build" to runCatching {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "unknown"
+    }.getOrDefault("unknown"))
     add("model" to "${Build.MANUFACTURER} ${Build.MODEL}")
     add("board" to "${Build.BOARD} / ${Build.HARDWARE}")
     add("android" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
