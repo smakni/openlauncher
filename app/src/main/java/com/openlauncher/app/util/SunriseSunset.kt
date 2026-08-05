@@ -5,6 +5,21 @@ import kotlin.math.*
 
 object SunriseSunset {
 
+    /** Local hour before which it counts as night, and after which it does again. */
+    private const val DAY_START_HOUR = 7
+    private const val NIGHT_START_HOUR = 19
+
+    /**
+     * Day or night from the clock alone, for when no GPS fix has arrived.
+     *
+     * Real sunrise and sunset move by a couple of hours over the year, so a fixed
+     * window is coarse. It still tracks the day, which is the point of the mode —
+     * a head unit sitting in a garage or still waiting on its first fix would
+     * otherwise stay pinned to one theme indefinitely.
+     */
+    fun isDayByClock(): Boolean =
+        Calendar.getInstance().get(Calendar.HOUR_OF_DAY) in DAY_START_HOUR until NIGHT_START_HOUR
+
     fun isDay(lat: Double, lon: Double): Boolean {
         val (rise, set) = localMinutes(lat, lon)
         val cal = Calendar.getInstance()

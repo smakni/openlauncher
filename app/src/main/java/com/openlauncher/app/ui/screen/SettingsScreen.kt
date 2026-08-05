@@ -719,11 +719,15 @@ fun SettingsScreen(
                     sublabel = "${"%.0f".format(settings.textScale * 100)}%",
                     icon     = Icons.Default.TextFields
                 ) {}
+                // Upper bound reaches 200%: head units commonly report densityDpi
+                // 160 on panels that are physically nearer 200 PPI, which renders
+                // everything about a quarter smaller than intended before the
+                // viewing distance in a car is even accounted for.
                 Slider(
                     value         = settings.textScale,
                     onValueChange = { onUpdate { copy(textScale = it) } },
-                    valueRange    = 0.8f..1.4f,
-                    steps         = 5,
+                    valueRange    = 0.8f..2.0f,
+                    steps         = 11,
                     colors        = sliderColors(accent),
                     modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
@@ -740,8 +744,8 @@ fun SettingsScreen(
                 Slider(
                     value         = settings.uiScale,
                     onValueChange = { onUpdate { copy(uiScale = it) } },
-                    valueRange    = 0.7f..1.5f,
-                    steps         = 7,
+                    valueRange    = 0.7f..2.5f,
+                    steps         = 17,
                     colors        = sliderColors(accent),
                     modifier      = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
                 )
@@ -1021,7 +1025,7 @@ private fun SettingsSection(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val isDayMode     = LocalDayMode.current
-    val sectionColor  = if (isDayMode) Color(0xFF888888) else Color(0xFF3A3A3A)
+    val sectionColor  = if (isDayMode) Color(0xFF888888) else Color(0xFF8A8A8A)
     val dividerColor  = if (isDayMode) Color(0xFFCCCCCC) else Color(0xFF1E1E1E)
     Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Text(
@@ -1046,7 +1050,7 @@ private fun SettingsRow(
 ) {
     val isDayMode   = LocalDayMode.current
     val labelColor  = if (isDayMode) Color(0xFF111111) else Color(0xFFDDDDDD)
-    val subColor    = if (isDayMode) Color(0xFF888888) else Color(0xFF444444)
+    val subColor    = if (isDayMode) Color(0xFF888888) else Color(0xFF9A9A9A)
     val iconTint    = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
     Row(
         modifier = Modifier
@@ -1075,8 +1079,11 @@ private fun ColumnScope.SettingsButton(
 ) {
     val isDayMode  = LocalDayMode.current
     val labelColor = if (isDayMode) Color(0xFF111111) else Color(0xFFDDDDDD)
-    val subColor   = if (isDayMode) Color(0xFF888888) else Color(0xFF444444)
-    val chevronC   = if (isDayMode) Color(0xFFBBBBBB) else Color(0xFF2A2A2A)
+    // Dark values raised for contrast: the previous sublabel sat around 2.2:1
+    // against the background and the chevron near 1.5:1, which is invisible on a
+    // dashboard in daylight. These land near 7.5:1 and 4.7:1.
+    val subColor   = if (isDayMode) Color(0xFF888888) else Color(0xFF9A9A9A)
+    val chevronC   = if (isDayMode) Color(0xFFBBBBBB) else Color(0xFF787878)
     val iconTint   = if (isDayMode) Color(0xFF777777) else MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
     Row(
         modifier = Modifier

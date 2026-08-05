@@ -431,7 +431,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         when (s.dayNightMode) {
             DayNightMode.DARK   -> false
             DayNightMode.LIGHT  -> true
-            DayNightMode.AUTO   -> if (loc != null) SunriseSunset.isDay(loc.latitude, loc.longitude) else false
+            // Falling back to the clock rather than to a fixed value: without a fix
+            // this used to pin the theme to dark and never switch again, which is
+            // the one thing the mode exists to avoid.
+            DayNightMode.AUTO   -> loc?.let { SunriseSunset.isDay(it.latitude, it.longitude) }
+                ?: SunriseSunset.isDayByClock()
             DayNightMode.SYSTEM -> false // placeholder — overridden in MainActivity via isSystemInDarkTheme()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
