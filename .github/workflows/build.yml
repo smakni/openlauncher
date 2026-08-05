@@ -2,9 +2,17 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, 'claude/**' ]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
+
+# A push to a branch with an open PR fires both the push and the pull_request
+# event, which built every commit twice. Limiting push to main leaves branch
+# builds to the PR event, and cancelling superseded runs means a quick series
+# of pushes only builds the last one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
