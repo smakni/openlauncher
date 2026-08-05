@@ -15,8 +15,17 @@
     <!-- Required for LocationManager.sendExtraCommand (A-GPS reset) — normal protection, auto-granted -->
     <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
 
-    <!-- Compass / sensors -->
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- Compass reads TYPE_ACCELEROMETER and TYPE_MAGNETIC_FIELD, neither of which
+         requires a permission. BODY_SENSORS covers heart-rate class hardware and was
+         only ever a no-op prompt here, so it is deliberately not declared. -->
+
+    <!-- OBD-II adapter (ELM327 over Bluetooth SPP).
+         Only CONNECT is declared: the dongle is paired once from the system
+         Bluetooth settings and the launcher talks to bonded devices only, so it
+         never needs to run a discovery scan. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
 
     <!-- Media session control (requires notification access grant by user) -->
     <uses-permission android:name="android.permission.MEDIA_CONTENT_CONTROL" />

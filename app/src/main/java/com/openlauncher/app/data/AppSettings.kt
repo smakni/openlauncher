@@ -2,6 +2,7 @@ package com.openlauncher.app.data
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import com.openlauncher.app.model.FuelType
 
 enum class ClockStyle { DIGITAL, ANALOG }
 enum class UnitSystem { METRIC, IMPERIAL }
@@ -103,7 +104,13 @@ data class AppSettings(
     val vitalsAsBars: Boolean = false,
     val speedometerDigitalOnly: Boolean = false,
     val gradientDirection: GradientDirection = GradientDirection.DIAGONAL,
-    val useCustomBackgroundColor: Boolean = false
+    val useCustomBackgroundColor: Boolean = false,
+    // OBD-II adapter. The MAC identifies the dongle; the name is kept alongside it
+    // so settings can label the selection without holding the Bluetooth permission.
+    val obdEnabled: Boolean = false,
+    val obdDeviceMac: String = "",
+    val obdDeviceName: String = "",
+    val fuelType: FuelType = FuelType.PETROL
 )
 
 fun defaultShortcuts() = listOf(

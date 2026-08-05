@@ -1,8 +1,13 @@
 package com.openlauncher.app.ui.screen
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -32,6 +37,8 @@ import com.openlauncher.app.data.SidebarPosition
 import com.openlauncher.app.data.ShortcutConfig
 import com.openlauncher.app.data.GradientDirection
 import com.openlauncher.app.data.UnitSystem
+import com.openlauncher.app.model.FuelType
+import com.openlauncher.app.model.ObdStatus
 import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.util.SunriseSunset
 import kotlinx.coroutines.launch
@@ -47,10 +54,19 @@ fun SettingsScreen(
     accent: Color,
     onUpdate: (AppSettings.() -> AppSettings) -> Unit,
     onReset: () -> Unit,
+    obdStatus: ObdStatus = ObdStatus.DISABLED,
+    pairedObdAdapters: () -> List<Pair<String, String>> = { emptyList() },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showResetDialog       by remember { mutableStateOf(false) }
+    var showObdPicker         by remember { mutableStateOf(false) }
+
+    // Opening the adapter list is what actually needs the grant, so it is asked
+    // for there rather than at startup — the launcher is useful without it.
+    val bluetoothPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) showObdPicker = true }
     var showAccentPicker      by remember { mutableStateOf(false) }
     var showBgPicker          by remember { mutableStateOf(false) }
     var showGradientEndPicker by remember { mutableStateOf(false) }
@@ -336,6 +352,77 @@ fun SettingsScreen(
                             selectedLabelColor     = Color.Black
                         )
                     )
+                }
+            }
+        }
+
+        // ── Engine Data ───────────────────────────────────────────────────────
+        SettingsSection("Engine Data") {
+            SettingsRow(
+                label    = "OBD-II Link",
+                sublabel = when {
+                    !settings.obdEnabled            -> "Off"
+                    settings.obdDeviceMac.isBlank() -> "No adapter selected"
+                    else -> when (obdStatus) {
+                        ObdStatus.CONNECTED    -> "Connected"
+                        ObdStatus.CONNECTING   -> "Connecting"
+                        ObdStatus.DISCONNECTED -> "Adapter unreachable — ignition off?"
+                        ObdStatus.DISABLED     -> "Off"
+                    }
+                },
+                icon = Icons.Default.Bluetooth
+            ) {
+                Switch(
+                    checked         = settings.obdEnabled,
+                    onCheckedChange = { onUpdate { copy(obdEnabled = it) } },
+                    colors          = switchColors(accent)
+                )
+            }
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Adapter",
+                sublabel = settings.obdDeviceName.ifEmpty { "None selected" },
+                icon     = Icons.Default.SettingsRemote,
+                accent   = accent,
+                onClick  = {
+                    if (needsBluetoothGrant(context)) {
+                        bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                    } else {
+                        showObdPicker = true
+                    }
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsRow(
+                label    = "Fuel Type",
+                sublabel = "Only used when the car reports no fuel rate of its own",
+                icon     = Icons.Default.LocalGasStation
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FuelType.entries.forEach { fuel ->
+                        FilterChip(
+                            selected = settings.fuelType == fuel,
+                            onClick  = { onUpdate { copy(fuelType = fuel) } },
+                            label    = {
+                                Text(
+                                    when (fuel) {
+                                        FuelType.PETROL -> "Petrol"
+                                        FuelType.DIESEL -> "Diesel"
+                                    },
+                                    fontSize      = 9.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = Color.Black
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -800,6 +887,65 @@ fun SettingsScreen(
         )
     }
 
+    if (showObdPicker) {
+        // Bonded devices only — pairing itself belongs to the system Bluetooth
+        // settings, so an empty list means the dongle has not been paired yet
+        // rather than that something failed.
+        val adapters = remember { pairedObdAdapters() }
+        AlertDialog(
+            onDismissRequest = { showObdPicker = false },
+            title = {
+                Text("SELECT OBD ADAPTER", fontSize = 12.sp, letterSpacing = 2.sp, color = accent)
+            },
+            text = {
+                if (adapters.isEmpty()) {
+                    Text(
+                        "No paired Bluetooth devices found. Pair your ELM327 dongle from the " +
+                            "system Bluetooth settings, then come back here.",
+                        fontSize = 12.sp
+                    )
+                } else {
+                    Column {
+                        adapters.forEach { (mac, name) ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onUpdate {
+                                            copy(
+                                                obdDeviceMac  = mac,
+                                                obdDeviceName = name,
+                                                obdEnabled    = true
+                                            )
+                                        }
+                                        showObdPicker = false
+                                    }
+                                    .padding(vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(name, fontSize = 13.sp)
+                                    Text(mac, fontSize = 10.sp, color = Color(0xFF888888))
+                                }
+                                if (settings.obdDeviceMac == mac) {
+                                    Icon(
+                                        Icons.Default.Check, null,
+                                        tint = accent, modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showObdPicker = false }) {
+                    Text("CLOSE", color = accent, fontSize = 11.sp)
+                }
+            }
+        )
+    }
+
     if (showAccentPicker) {
         ColorPickerDialog(
             title           = "Accent Color",
@@ -978,6 +1124,15 @@ private fun sliderColors(accent: Color): androidx.compose.material3.SliderColors
     )
 }
 
+
+/**
+ * BLUETOOTH_CONNECT only became a runtime permission in API 31; on anything older
+ * the manifest declaration is granted at install time and there is nothing to ask for.
+ */
+private fun needsBluetoothGrant(context: Context): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+            PackageManager.PERMISSION_GRANTED
 
 private fun fontDisplayName(font: AppFont): String = when (font) {
     AppFont.SYSTEM          -> "System"
