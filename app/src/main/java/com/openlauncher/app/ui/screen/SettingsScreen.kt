@@ -45,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import com.openlauncher.app.ui.components.ColorPickerDialog
 import com.openlauncher.app.ui.components.ConfirmDialog
+import com.openlauncher.app.ui.components.DiagnosticsDialog
 
 // Resolved at call site via LocalDayMode — see SettingsDivider / SettingsSection
 
@@ -61,6 +62,7 @@ fun SettingsScreen(
     val context = LocalContext.current
     var showResetDialog       by remember { mutableStateOf(false) }
     var showObdPicker         by remember { mutableStateOf(false) }
+    var showDiagnostics       by remember { mutableStateOf(false) }
 
     // Opening the adapter list is what actually needs the grant, so it is asked
     // for there rather than at startup — the launcher is useful without it.
@@ -848,6 +850,16 @@ fun SettingsScreen(
 
         // ── Maintenance ──────────────────────────────────────────────────────
         SettingsSection("Maintenance") {
+            SettingsButton(
+                label    = "Head Unit Diagnostics",
+                sublabel = "Screen metrics, sensors, vendor packages",
+                icon     = Icons.Default.Info,
+                accent   = accent,
+                onClick  = { showDiagnostics = true }
+            )
+
+            SettingsDivider()
+
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick  = { showResetDialog = true },
@@ -885,6 +897,10 @@ fun SettingsScreen(
             onConfirm    = { onReset(); showResetDialog = false },
             onDismiss    = { showResetDialog = false }
         )
+    }
+
+    if (showDiagnostics) {
+        DiagnosticsDialog(accent = accent, onDismiss = { showDiagnostics = false })
     }
 
     if (showObdPicker) {
