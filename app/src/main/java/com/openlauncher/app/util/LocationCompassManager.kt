@@ -66,8 +66,21 @@ class LocationCompassManager(context: Context) {
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
     }
 
+    /** When the last satellite fix arrived, used to keep network fixes from displacing it. */
+    private var lastGpsFixMs = 0L
+
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
+            val isGps = loc.provider == LocationManager.GPS_PROVIDER
+            if (isGps) {
+                lastGpsFixMs = System.currentTimeMillis()
+            } else if (System.currentTimeMillis() - lastGpsFixMs < GPS_PREFERENCE_WINDOW_MS) {
+                // Both providers feed this one listener. A network fix carries no
+                // speed, so letting one through while satellite fixes are still
+                // arriving drops the speed readout to zero between them.
+                return
+            }
+
             _location.value = LocationData(
                 latitude  = loc.latitude,
                 longitude = loc.longitude,
@@ -119,8 +132,12 @@ class LocationCompassManager(context: Context) {
         // GPS Provider (Works 100% offline, sat-based)
         try {
             if (locationManager.allProviders.contains(LocationManager.GPS_PROVIDER)) {
+                // No interval or distance filter: the speed readout should track
+                // the car, and a 3s/5m filter made it lag by seconds and stall
+                // outright at low speed. GPS hardware caps itself near 1Hz, so
+                // asking for everything simply means every fix it produces.
                 locationManager.requestLocationUpdates(
-                    LocationManager.GPS_PROVIDER, 3000L, 5f, locationListener
+                    LocationManager.GPS_PROVIDER, 0L, 0f, locationListener
                 )
                 locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
                     locationListener.onLocationChanged(it)
@@ -145,5 +162,15 @@ class LocationCompassManager(context: Context) {
         sensorManager.unregisterListener(sensorListener)
         locationManager.removeUpdates(locationListener)
         lastLocationForBearing = null
+        lastGpsFixMs = 0L
+    }
+
+    private companion object {
+        /**
+         * How long a satellite fix keeps precedence over network fixes. Comfortably
+         * longer than the ~1Hz GPS produces, so network positions only take over
+         * once satellites have genuinely dropped out.
+         */
+        const val GPS_PREFERENCE_WINDOW_MS = 10_000L
     }
 }

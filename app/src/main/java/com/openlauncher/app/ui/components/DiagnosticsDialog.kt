@@ -81,6 +81,17 @@ private fun DiagRow(label: String, value: String, accent: Color) {
     }
 }
 
+/**
+ * Substrings worth surfacing from the settings provider. "ill" catches the
+ * illumination signal — the headlight line every car stereo is wired to, and how
+ * the Evoque's own system knows to switch its display to night colours.
+ */
+private val VEHICLE_KEY_HINTS = listOf(
+    "ill", "light", "lamp", "night", "day", "dim",
+    "speed", "rpm", "canbus", "can_", "mcu", "acc_", "reverse", "brake", "door", "temp",
+    "sys_", "car"
+)
+
 private fun collectDiagnostics(context: Context): List<Pair<String, String>> = buildList {
     val metrics = context.resources.displayMetrics
     add("model" to "${Build.MANUFACTURER} ${Build.MODEL}")
@@ -154,6 +165,40 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
                 components == null      -> "not installed"
                 components.isEmpty()    -> "no components"
                 else                    -> components.take(8).joinToString("\n")
+            }
+        )
+    }
+
+    // Vendor state often lands in the settings provider rather than in an API —
+    // the upstream szchoiceway radio support already reads SYS_MEDIA_INFO_JSON
+    // that way. With no provider or bindable interface on this unit's CAN
+    // package, this is the remaining place vehicle state could be readable.
+    for ((name, uri) in listOf(
+        "settings.system" to android.provider.Settings.System.CONTENT_URI,
+        "settings.global" to android.provider.Settings.Global.CONTENT_URI
+    )) {
+        val hits = runCatching {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameCol = cursor.getColumnIndex("name")
+                val valueCol = cursor.getColumnIndex("value")
+                if (nameCol < 0) return@use emptyList<String>()
+                buildList {
+                    while (cursor.moveToNext()) {
+                        val key = cursor.getString(nameCol) ?: continue
+                        if (VEHICLE_KEY_HINTS.any { key.contains(it, ignoreCase = true) }) {
+                            val value = if (valueCol >= 0) cursor.getString(valueCol) else null
+                            add(if (value.isNullOrEmpty()) key else "$key=${value.take(24)}")
+                        }
+                    }
+                }
+            }
+        }.getOrNull()
+
+        add(
+            name to when {
+                hits == null    -> "not readable"
+                hits.isEmpty()  -> "no matching keys"
+                else            -> hits.take(12).joinToString("\n")
             }
         )
     }
