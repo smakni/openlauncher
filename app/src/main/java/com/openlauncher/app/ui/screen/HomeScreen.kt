@@ -66,6 +66,7 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("VITALS",      "VITALS",      Icons.Default.Dns,           "Head Unit Health / Vitals"),
     WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads"),
+    WidgetTypeInfo("VEHICLE",     "VEHICLE",     Icons.Default.DirectionsCar, "Live engine data (OBD-II)"),
     WidgetTypeInfo("APP_SHORTCUT_1", "APP 1",    Icons.Default.Apps,          "Shortcut to an app"),
     WidgetTypeInfo("APP_SHORTCUT_2", "APP 2",    Icons.Default.Apps,          "Shortcut to an app")
 )
@@ -81,6 +82,7 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
         if (settings.showVitals) add("VITALS")
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
+        if (settings.showVehicle) add("VEHICLE")
         if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
         if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
@@ -141,6 +143,8 @@ fun HomeScreen(
     installedIconFor: (String) -> android.graphics.drawable.Drawable? = { null },
     onLaunchApp: (String) -> Unit = {},
     onAssignAppTile: (Int) -> Unit = {},
+    vehicle: com.openlauncher.app.model.VehicleState = com.openlauncher.app.model.VehicleState(),
+    obdStatus: com.openlauncher.app.model.ObdStatus = com.openlauncher.app.model.ObdStatus.DISABLED,
     modifier: Modifier = Modifier
 ) {
     // Corrected against the background here too: this screen builds its own
@@ -255,7 +259,8 @@ fun HomeScreen(
                 if (settings.showVitals) add("VITALS")
                 if (settings.showTripTracker) add("TRIP_TRACKER")
                 if (settings.showSoundboard) add("SOUNDBOARD")
-                if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
+                if (settings.showVehicle) add("VEHICLE")
+        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
                 if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
             }
 
@@ -332,6 +337,7 @@ fun HomeScreen(
                     "SPEEDOMETER" -> "SPEED"
                     "TRIP_TRACKER" -> "TRIP"
                     "SOUNDBOARD"  -> "SOUND"
+                    "VEHICLE"     -> "VEHICLE"
                     "APP_SHORTCUT_1" -> settings.appShortcutTiles.getOrNull(0)
                         ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 1"
                     "APP_SHORTCUT_2" -> settings.appShortcutTiles.getOrNull(1)
@@ -490,6 +496,14 @@ fun HomeScreen(
                             isDayMode = isDayMode,
                             isEditing = editMode,
                             onUpdatePad = onUpdateSoundPad,
+                            modifier  = Modifier.fillMaxSize()
+                        )
+                        "VEHICLE" -> VehicleWidget(
+                            state     = vehicle,
+                            status    = obdStatus,
+                            accent    = accent,
+                            metric    = settings.unitSystem.name == "METRIC",
+                            isDayMode = isDayMode,
                             modifier  = Modifier.fillMaxSize()
                         )
                         "APP_SHORTCUT_1", "APP_SHORTCUT_2" -> {
@@ -871,6 +885,7 @@ private fun WidgetLibraryDialog(
         if (settings.showVitals) add("VITALS")
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
+        if (settings.showVehicle) add("VEHICLE")
         if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
         if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }

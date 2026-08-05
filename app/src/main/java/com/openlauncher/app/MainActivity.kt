@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
             val weather     by vm.weather.collectAsStateWithLifecycle()
             val location    by vm.location.collectAsStateWithLifecycle()
             val obdStatus   by vm.obdStatus.collectAsStateWithLifecycle()
+            val vehicle     by vm.vehicle.collectAsStateWithLifecycle()
             val bearing     by vm.compassBearing.collectAsStateWithLifecycle()
             val isWifi      by vm.isWifi.collectAsStateWithLifecycle()
             val isData      by vm.isData.collectAsStateWithLifecycle()
@@ -203,6 +204,8 @@ class MainActivity : ComponentActivity() {
                                         installedIconFor    = { pkg -> apps.find { it.packageName == pkg }?.icon },
                                         onLaunchApp         = { pkg -> vm.launchApp(pkg) },
                                         onAssignAppTile     = { index -> vm.startAppTilePicker(index) },
+                                        vehicle             = vehicle,
+                                        obdStatus           = obdStatus,
                                         settings            = settings,
                                         weather             = weather,
                                         nowPlaying          = nowPlaying,
