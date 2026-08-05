@@ -51,8 +51,12 @@ data class ShortcutConfig(
     val customIconOverride: DefaultShortcutIcon? = null
 )
 
-const val GRID_COLS = 3
-const val GRID_ROWS = 2
+// Sized for the ultrawide panels these units ship: 1920x660dp of usable space
+// once the system bar is taken out leaves roughly 225x205dp per cell, which is
+// close to square. A 3x2 grid on the same panel produces 620x310dp cells — six
+// tiles so large the screen reads as mostly empty.
+const val GRID_COLS = 8
+const val GRID_ROWS = 3
 
 data class WidgetConfig(
     val id: String,          // "CLOCK" | "WEATHER" | "TELEMETRY" | "NOW_PLAYING"
@@ -120,11 +124,19 @@ fun defaultShortcuts() = listOf(
     ShortcutConfig(label = "Phone", isDefault = true, defaultIcon = DefaultShortcutIcon.PHONE)
 )
 
+/**
+ * Default arrangement on the 8x3 grid.
+ *
+ * Widgets span several cells rather than sitting one per cell: at this density a
+ * single cell is too small to read at a glance while driving. Columns 6 and 7 are
+ * deliberately left free so there is somewhere obvious to drop a widget added
+ * from the library without having to rearrange first.
+ */
 fun defaultWidgetLayout() = listOf(
-    WidgetConfig("CLOCK",       gridX = 0, gridY = 0, spanX = 1, spanY = 1),
-    WidgetConfig("WEATHER",     gridX = 1, gridY = 0, spanX = 1, spanY = 1),
-    WidgetConfig("TELEMETRY",   gridX = 2, gridY = 0, spanX = 1, spanY = 2),
-    WidgetConfig("NOW_PLAYING", gridX = 0, gridY = 1, spanX = 2, spanY = 1)
+    WidgetConfig("CLOCK",       gridX = 0, gridY = 0, spanX = 2, spanY = 1),
+    WidgetConfig("WEATHER",     gridX = 2, gridY = 0, spanX = 2, spanY = 1),
+    WidgetConfig("TELEMETRY",   gridX = 4, gridY = 0, spanX = 2, spanY = 3),
+    WidgetConfig("NOW_PLAYING", gridX = 0, gridY = 1, spanX = 4, spanY = 2)
 )
 
 fun AppSettings.activeWidgetIds(): Set<String> = buildSet {

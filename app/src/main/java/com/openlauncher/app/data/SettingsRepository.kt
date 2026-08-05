@@ -90,8 +90,11 @@ class SettingsRepository(private val context: Context) {
                         object : TypeToken<List<WidgetConfig>>() {}.type
                     )
                 }.getOrNull() ?: defaults.widgetLayout
-                // Migrate: old 2×2 layout has no widget with gridX≥2 — replace with new 3×2 default
-                if (loaded.none { it.gridX >= 2 }) defaults.widgetLayout else loaded
+                // A layout saved against the old 3-column grid never reaches past
+                // column 3, and carried onto the 8-column one it would huddle in
+                // the top-left corner of a mostly empty screen. Treat that as a
+                // legacy layout and start from the current default instead.
+                if (loaded.none { it.gridX + it.spanX > 3 }) defaults.widgetLayout else loaded
             } else defaults.widgetLayout
 
             return AppSettings(

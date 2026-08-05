@@ -130,6 +130,34 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
     add("vendor pkgs" to if (vendor.isEmpty()) "none found" else vendor.take(6).joinToString("\n"))
     add("szchoiceway" to if (installed.any { it.startsWith("com.szchoiceway") }) "YES" else "no")
 
+    // The FYT/SYU platform talks to its MCU and CAN decoder over bound services
+    // and broadcasts whose names are not documented anywhere. Listing the actual
+    // exported components is what makes it possible to integrate against real
+    // names instead of guessing at an interface.
+    for (pkg in listOf("com.syu.canbus", "com.syu.carradio", "com.syu.ipc", "com.fyt.screenbutton")) {
+        val components = runCatching {
+            @Suppress("DEPRECATION")
+            val info = pm.getPackageInfo(
+                pkg,
+                PackageManager.GET_SERVICES or PackageManager.GET_RECEIVERS or
+                    PackageManager.GET_PROVIDERS
+            )
+            buildList {
+                info.services?.forEach { add("S ${it.name.substringAfterLast('.')}") }
+                info.receivers?.forEach { add("R ${it.name.substringAfterLast('.')}") }
+                info.providers?.forEach { add("P ${it.authority}") }
+            }
+        }.getOrNull()
+
+        add(
+            pkg.substringAfterLast('.') to when {
+                components == null      -> "not installed"
+                components.isEmpty()    -> "no components"
+                else                    -> components.take(8).joinToString("\n")
+            }
+        )
+    }
+
     add("home app" to runCatching {
         val intent = android.content.Intent(android.content.Intent.ACTION_MAIN)
             .addCategory(android.content.Intent.CATEGORY_HOME)
