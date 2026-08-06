@@ -340,14 +340,28 @@ private fun ShortcutSlot(
             }
             resolvedIcon != null -> {
                 // Cache per icon — every slot recomposes each drag frame, and an
-                // un-remembered toBitmap allocated a fresh bitmap per slot per frame
-                val bmp = remember(resolvedIcon) { resolvedIcon.toBitmap(44, 44) }
-                Icon(
-                    painter            = BitmapPainter(bmp.asImageBitmap()),
-                    contentDescription = shortcut.label,
-                    tint               = Color.Unspecified,
-                    modifier           = Modifier.size(26.dp)
-                )
+                // un-remembered toBitmap allocated a fresh bitmap per slot per frame.
+                // Guarded because a malformed or outsized drawable from any
+                // installed app would otherwise throw during composition, and this
+                // bar is on screen everywhere — the app library already does this.
+                val bmp = remember(resolvedIcon) {
+                    runCatching { resolvedIcon.toBitmap(44, 44) }.getOrNull()
+                }
+                if (bmp != null) {
+                    Icon(
+                        painter            = BitmapPainter(bmp.asImageBitmap()),
+                        contentDescription = shortcut.label,
+                        tint               = Color.Unspecified,
+                        modifier           = Modifier.size(26.dp)
+                    )
+                } else {
+                    Icon(
+                        Icons.Default.Apps,
+                        contentDescription = shortcut.label,
+                        tint               = tint,
+                        modifier           = Modifier.size(ICON_SIZE)
+                    )
+                }
             }
             shortcut.isDefault -> {
                 Icon(

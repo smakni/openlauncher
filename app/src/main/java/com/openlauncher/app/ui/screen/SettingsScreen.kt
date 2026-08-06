@@ -222,10 +222,15 @@ fun SettingsScreen(
                 icon     = if (isMediaConnected) Icons.Default.NotificationsActive else Icons.Default.NotificationsOff,
                 accent   = if (isMediaConnected) accent else Color(0xFF993333),
                 onClick  = {
-                    context.startActivity(
-                        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
+                    // Guarded like every other system screen here: a head unit ROM
+                    // can be built without the settings activity this names, and an
+                    // intent that resolves to nothing throws rather than no-ops.
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
                 }
             )
             SettingsDivider()
@@ -867,8 +872,23 @@ fun SettingsScreen(
                 icon     = Icons.Default.SystemUpdate,
                 accent   = accent,
                 onClick  = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/dw2lam/openlauncher/releases"))
-                    context.startActivity(intent)
+                    val url = "https://github.com/dw2lam/openlauncher/releases"
+                    // Plenty of head units ship without a browser at all, and then
+                    // ACTION_VIEW resolves to nothing. Putting the address on the
+                    // clipboard at least leaves it somewhere reachable.
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }.onFailure {
+                        runCatching {
+                            context.getSystemService(android.content.ClipboardManager::class.java)
+                                ?.setPrimaryClip(
+                                    android.content.ClipData.newPlainText("releases", url)
+                                )
+                        }
+                    }
                 }
             )
         }
