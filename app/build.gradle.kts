@@ -61,6 +61,8 @@ android {
 
     buildFeatures {
         compose = true
+        // The vendor vehicle-data interfaces are declared as AIDL.
+        aidl = true
     }
 }
 

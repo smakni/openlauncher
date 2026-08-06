@@ -74,6 +74,8 @@ fun SettingsScreen(
     // stored name would go stale the moment one is deleted outside the app.
     var offlineMaps by remember { mutableStateOf(OfflineMapStore.installedArchives(context)) }
     var vendorExport by remember { mutableStateOf<String?>(null) }
+    var syuProbe by remember { mutableStateOf<com.openlauncher.app.util.SyuProbe?>(null) }
+    var syuProbeStatus by remember { mutableStateOf<String?>(null) }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -951,6 +953,25 @@ fun SettingsScreen(
                 icon     = Icons.Default.Map,
                 accent   = accent,
                 onClick  = { runCatching { mapArchivePicker.launch(arrayOf("*/*")) } }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Probe Vehicle Data",
+                sublabel = syuProbeStatus ?: "Sweeps the SYU service for readable ids",
+                icon     = Icons.Default.Sensors,
+                accent   = accent,
+                onClick  = {
+                    val probe = syuProbe ?: com.openlauncher.app.util.SyuProbe(context)
+                        .also { syuProbe = it }
+                    if (syuProbe != null && syuProbeStatus?.contains("ids") == true) {
+                        syuProbeStatus = probe.writeReport()
+                    } else {
+                        probe.start()
+                        syuProbeStatus = "sweeping — press again in ~20s to save"
+                    }
+                }
             )
 
             SettingsDivider()
