@@ -1,7 +1,7 @@
 {
   "version": 8,
   "name": "Open Launcher",
-  "glyphs": "https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf",
+  "glyphs": "asset://glyphs/{fontstack}/{range}.pbf",
   "sources": {
     "protomaps": {
       "type": "vector",
