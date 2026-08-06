@@ -47,22 +47,28 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val obdMgr       = ObdManager(application)
 
     // ── Offline map ───────────────────────────────────────────────────────────
-    private val mapDownloader = com.openlauncher.app.util.OfflineMapDownloader(application)
+    // Lazy: building this eagerly touched MapLibre before it was initialised
+    // and crashed the launcher at startup.
+    private val mapDownloader by lazy {
+        com.openlauncher.app.util.OfflineMapDownloader(getApplication())
+    }
     val mapDownload: StateFlow<com.openlauncher.app.util.DownloadState> = mapDownloader.state
 
     /**
      * Style URI with its tile source resolved. Rewritten on each call because an
      * archive can be imported, or the remote build changed, between calls.
      */
-    fun mapStyleUri(): String =
+    fun mapStyleUri(): String = runCatching {
         com.openlauncher.app.util.OfflineMapStore.resolvedStyleUri(
             getApplication(), settings.value.pmtilesUrl
         )
+    }.getOrDefault("")
 
-    fun hasMapData(): Boolean =
+    fun hasMapData(): Boolean = runCatching {
         com.openlauncher.app.util.OfflineMapStore.hasAnySource(
             getApplication(), settings.value.pmtilesUrl
         )
+    }.getOrDefault(false)
 
     /** Downloads the area around the last fix; without one there is no centre. */
     fun downloadMapAroundMe() {

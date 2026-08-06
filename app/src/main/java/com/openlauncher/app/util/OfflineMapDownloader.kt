@@ -3,6 +3,7 @@ package com.openlauncher.app.util
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.maplibre.android.MapLibre
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.offline.OfflineManager
@@ -31,14 +32,34 @@ sealed interface DownloadState {
  * at 17. The chosen range shows streets clearly without pulling building
  * outlines for a whole region.
  */
-class OfflineMapDownloader(context: Context) {
+class OfflineMapDownloader(private val context: Context) {
 
-    private val manager = OfflineManager.getInstance(context)
+    /**
+     * Resolved on first use, not at construction.
+     *
+     * OfflineManager throws unless MapLibre has been initialised first, and this
+     * class used to be built while the view model was, before any map code had
+     * run — which took the whole launcher down at startup, on a device where the
+     * launcher is the home screen. Nothing about the map is allowed to do that,
+     * so initialisation is deferred and failure leaves the feature inert rather
+     * than propagating.
+     */
+    private val manager: OfflineManager? by lazy {
+        runCatching {
+            MapLibre.getInstance(context)
+            OfflineManager.getInstance(context)
+        }.getOrNull()
+    }
 
     private val _state = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val state: StateFlow<DownloadState> = _state
 
     fun download(styleUrl: String, centre: LatLng, radiusKm: Double) {
+        val manager = this.manager
+        if (manager == null) {
+            _state.value = DownloadState.Failed("map engine unavailable")
+            return
+        }
         _state.value = DownloadState.Running(0, 0)
 
         val definition = OfflineTilePyramidRegionDefinition(
@@ -95,6 +116,7 @@ class OfflineMapDownloader(context: Context) {
 
     /** Removes every downloaded region, freeing the store. */
     fun clear(onDone: () -> Unit = {}) {
+        val manager = this.manager ?: return onDone()
         manager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(regions: Array<OfflineRegion>?) {
                 regions?.forEach { region ->
