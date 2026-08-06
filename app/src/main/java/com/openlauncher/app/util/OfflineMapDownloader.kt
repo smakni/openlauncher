@@ -106,9 +106,13 @@ class OfflineMapDownloader(private val context: Context) {
                                 // this to walk, and waiting longer changes nothing.
                                 if (status.requiredResourceCount <= 1L) {
                                     region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                                    // Deliberately not naming a cause: this fires
+                                    // for any style that yields no tiles, and
+                                    // asserting PMTiles once reported the wrong
+                                    // reason for a style that was not one.
                                     DownloadState.Failed(
-                                        "PMTiles source yields no tiles to enumerate — " +
-                                            "use Offline Map Archive instead"
+                                        "style yielded no tiles — check the Tile URL, " +
+                                            "or use Offline Map Archive"
                                     )
                                 } else DownloadState.Running(
                                     percent.coerceIn(0, 100),

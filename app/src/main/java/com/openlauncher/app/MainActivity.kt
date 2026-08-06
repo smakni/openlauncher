@@ -71,10 +71,16 @@ class MainActivity : ComponentActivity() {
             val location    by vm.location.collectAsStateWithLifecycle()
             val obdStatus   by vm.obdStatus.collectAsStateWithLifecycle()
             val mapDownload by vm.mapDownload.collectAsStateWithLifecycle()
-            // Resolving the style writes a file, so it is keyed on the setting
-            // that changes it rather than run on every recomposition.
-            val mapStyleUri = remember(settings.pmtilesUrl) { vm.mapStyleUri() }
-            val hasMapData  = remember(settings.pmtilesUrl) { vm.hasMapData() }
+            // Resolving the style writes a file, so it is keyed on the settings
+            // that change it rather than run on every recomposition. Both keys
+            // matter: keyed on the PMTiles URL alone, switching to a tile
+            // template left the old style in place and the source unchanged.
+            val mapStyleUri = remember(settings.pmtilesUrl, settings.tileUrlTemplate) {
+                vm.mapStyleUri()
+            }
+            val hasMapData = remember(settings.pmtilesUrl, settings.tileUrlTemplate) {
+                vm.hasMapData()
+            }
             val vehicle     by vm.vehicle.collectAsStateWithLifecycle()
             val bearing     by vm.compassBearing.collectAsStateWithLifecycle()
             val isWifi      by vm.isWifi.collectAsStateWithLifecycle()
