@@ -73,6 +73,7 @@ fun SettingsScreen(
     // Listed from disk rather than from settings: the archive is a file, and a
     // stored name would go stale the moment one is deleted outside the app.
     var offlineMaps by remember { mutableStateOf(OfflineMapStore.installedArchives(context)) }
+    var vendorExport by remember { mutableStateOf<String?>(null) }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -949,6 +950,21 @@ fun SettingsScreen(
                 icon     = Icons.Default.Map,
                 accent   = accent,
                 onClick  = { runCatching { mapArchivePicker.launch(arrayOf("*/*")) } }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Export Vendor APKs",
+                sublabel = vendorExport
+                    ?: "Copies the SYU packages out so their interfaces can be read",
+                icon     = Icons.Default.Archive,
+                accent   = accent,
+                onClick  = {
+                    val results = com.openlauncher.app.util.VendorApkExporter.exportAll(context)
+                    vendorExport = results.joinToString("  ·  ") +
+                        "  →  ${com.openlauncher.app.util.VendorApkExporter.exportDir(context)}"
+                }
             )
 
             SettingsDivider()
