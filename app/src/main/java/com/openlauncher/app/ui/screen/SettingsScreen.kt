@@ -80,6 +80,7 @@ fun SettingsScreen(
     // tested whether that text contained a word, and the first press overwrote it
     // with a message that did not, so the save branch was unreachable.
     var syuProbeRunning by remember { mutableStateOf(false) }
+    var showSyuLive by remember { mutableStateOf(false) }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -1025,6 +1026,24 @@ fun SettingsScreen(
             SettingsDivider()
 
             SettingsButton(
+                label    = "Live Vehicle Values",
+                sublabel = "Watch which id moves as you turn a knob",
+                icon     = Icons.Default.Timeline,
+                accent   = accent,
+                onClick  = {
+                    val probe = syuProbe ?: com.openlauncher.app.util.SyuProbe(context)
+                        .also { syuProbe = it }
+                    if (!syuProbeRunning) {
+                        probe.start()
+                        syuProbeRunning = true
+                    }
+                    showSyuLive = true
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
                 label    = "Dump Vendor Interfaces",
                 sublabel = vendorExport
                     ?: "Reads the SYU AIDL signatures out as text",
@@ -1090,6 +1109,14 @@ fun SettingsScreen(
             onConfirm    = { onReset(); showResetDialog = false },
             onDismiss    = { showResetDialog = false }
         )
+    }
+
+    if (showSyuLive) {
+        syuProbe?.let { probe ->
+            com.openlauncher.app.ui.components.SyuLiveDialog(
+                probe = probe, accent = accent, onDismiss = { showSyuLive = false }
+            )
+        }
     }
 
     if (showDiagnostics) {

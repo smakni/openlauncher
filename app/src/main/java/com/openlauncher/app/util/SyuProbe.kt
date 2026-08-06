@@ -38,6 +38,20 @@ class SyuProbe(private val context: Context) {
     private val _status = MutableStateFlow("idle")
     val status: StateFlow<String> = _status
 
+    /**
+     * Current values, published as they arrive.
+     *
+     * Watching a value move while turning the knob that causes it identifies an
+     * id immediately, where comparing exported files cannot: it needs one action
+     * at a time and a round trip per guess.
+     */
+    private val _live = MutableStateFlow<List<Reading>>(emptyList())
+    val live: StateFlow<List<Reading>> = _live
+
+    /** When each id last changed, so the display can show what just moved. */
+    private val _lastChangedAt = MutableStateFlow<Map<Pair<Int, Int>, Long>>(emptyMap())
+    val lastChangedAt: StateFlow<Map<Pair<Int, Int>, Long>> = _lastChangedAt
+
     private val readings = linkedMapOf<Pair<Int, Int>, Reading>()
 
     /**
@@ -112,7 +126,12 @@ class SyuProbe(private val context: Context) {
                             // the handful that actually respond to something.
                             if (previous == null || previous != reading) {
                                 timeline += (System.currentTimeMillis() - startedAtMs) to reading
+                                _lastChangedAt.value = _lastChangedAt.value +
+                                    ((module to updateId) to System.currentTimeMillis())
                             }
+                            _live.value = readings.values.sortedWith(
+                                compareBy({ it.module }, { it.id })
+                            )
                         }
                     }
                 }
