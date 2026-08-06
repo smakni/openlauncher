@@ -676,7 +676,7 @@ fun SettingsScreen(
                 sublabel = if (settings.wallpaperUri.isNotEmpty()) "Custom wallpaper active" else "Choose image from gallery",
                 icon     = Icons.Default.Wallpaper,
                 accent   = accent,
-                onClick  = { wallpaperPicker.launch(arrayOf("image/*")) }
+                onClick  = { runCatching { wallpaperPicker.launch(arrayOf("image/*")) } }
             )
             if (settings.wallpaperUri.isNotEmpty()) {
                 Column {
@@ -928,7 +928,7 @@ fun SettingsScreen(
                     .joinToString(", "),
                 icon     = Icons.Default.Map,
                 accent   = accent,
-                onClick  = { mapArchivePicker.launch(arrayOf("*/*")) }
+                onClick  = { runCatching { mapArchivePicker.launch(arrayOf("*/*")) } }
             )
 
             SettingsDivider()

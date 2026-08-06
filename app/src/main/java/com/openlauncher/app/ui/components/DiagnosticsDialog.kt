@@ -99,12 +99,34 @@ fun DiagnosticsDialog(accent: Color, onDismiss: () -> Unit) {
                 }) { Text("COPY", color = accent, fontSize = 11.sp) }
 
                 TextButton(onClick = {
-                    exporter.launch("headunit-diagnostics.txt")
+                    // Launching the picker is what can fail: head unit ROMs often
+                    // ship without a documents provider, and the intent then
+                    // resolves to nothing and throws. Falling back to a fixed
+                    // path means the file still gets written on those units.
+                    exportResult = runCatching {
+                        exporter.launch("headunit-diagnostics.txt")
+                        null
+                    }.getOrElse { writeToAppStorage(context, allRows) }
                 }) { Text("EXPORT", color = accent, fontSize = 11.sp) }
             }
         }
     )
 }
+
+/**
+ * Writes the diagnostics to app storage and returns where they landed.
+ *
+ * Used when no documents provider answers the picker intent. External files are
+ * reachable from a file manager and over USB, unlike internal storage, so the
+ * result can still be got off the unit — which is the whole point of exporting.
+ */
+private fun writeToAppStorage(context: Context, rows: List<Pair<String, String>>): String =
+    runCatching {
+        val dir = context.getExternalFilesDir(null) ?: error("no external storage")
+        val file = java.io.File(dir, "headunit-diagnostics.txt")
+        file.writeText(asPlainText(rows))
+        "saved to ${file.absolutePath}"
+    }.getOrElse { "no file picker, and saving failed: ${it.message}" }
 
 /**
  * Flattens the rows into a text file.

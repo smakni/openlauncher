@@ -65,6 +65,23 @@ fun MapWidget(
         return
     }
 
+    // A stand-in while the grid is being rearranged. MapView is the one Android
+    // view among the widgets, and it consumes touches before Compose can read
+    // them as a drag or a resize — so the tile could not be moved or resized at
+    // all. Not rendering it during editing hands the gestures back, and also
+    // avoids dragging a live GL surface around the screen.
+    if (isEditing) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                text = "MAP",
+                color = accent,
+                fontSize = 14.sp,
+                letterSpacing = 2.sp
+            )
+        }
+        return
+    }
+
     // Must run before any MapView is constructed. It is idempotent, so calling
     // it each time the widget appears is safe.
     remember { MapLibre.getInstance(context) }
@@ -89,9 +106,6 @@ fun MapWidget(
             factory = { mapView },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
-                // Gestures off while rearranging, so a drag moves the widget
-                // rather than panning the map underneath it.
-                view.setOnTouchListener { _, _ -> isEditing }
                 view.getMapAsync { map ->
                     map.setStyle(Style.Builder().fromUri(styleUri))
                     map.uiSettings.apply {
