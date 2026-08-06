@@ -215,6 +215,58 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
         )
     }
 
+    // The system status bar shows an outside temperature, so something on the
+    // device supplies it, but no key named for it turned up. Search by value
+    // instead: anything sitting in a plausible temperature range, in degrees or
+    // in tenths, across all three settings tables. This finds the key whatever
+    // it happens to be called.
+    val temperatureCandidates = buildList {
+        for ((table, uri) in listOf(
+            "sys" to android.provider.Settings.System.CONTENT_URI,
+            "sec" to android.provider.Settings.Secure.CONTENT_URI,
+            "glb" to android.provider.Settings.Global.CONTENT_URI
+        )) {
+            runCatching {
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameCol = cursor.getColumnIndex("name")
+                    val valueCol = cursor.getColumnIndex("value")
+                    if (nameCol < 0 || valueCol < 0) return@use
+                    while (cursor.moveToNext()) {
+                        val key = cursor.getString(nameCol) ?: continue
+                        val raw = cursor.getString(valueCol) ?: continue
+                        val number = raw.replace(',', '.').toFloatOrNull() ?: continue
+                        val looksLikeCelsius = number in 5f..45f && raw.contains('.')
+                        val looksLikeTenths = number in 50f..450f && !raw.contains('.')
+                        if (looksLikeCelsius || looksLikeTenths) add("$table $key=$raw")
+                    }
+                }
+            }
+        }
+    }
+    add(
+        "temp candidates" to
+            if (temperatureCandidates.isEmpty()) "none" else temperatureCandidates.sorted().joinToString("\n")
+    )
+
+    // Secure was never listed, unlike System and Global. Shown whole for the
+    // same reason System is: a vendor key can be named anything.
+    add("settings.secure" to runCatching {
+        context.contentResolver.query(
+            android.provider.Settings.Secure.CONTENT_URI, null, null, null, null
+        )?.use { cursor ->
+            val nameCol = cursor.getColumnIndex("name")
+            val valueCol = cursor.getColumnIndex("value")
+            if (nameCol < 0) return@use "unreadable"
+            buildList {
+                while (cursor.moveToNext()) {
+                    val key = cursor.getString(nameCol) ?: continue
+                    val value = if (valueCol >= 0) cursor.getString(valueCol) else null
+                    add(if (value.isNullOrEmpty()) key else "$key=${value.take(16)}")
+                }
+            }.sorted().joinToString("\n")
+        } ?: "no rows"
+    }.getOrElse { "not readable" })
+
     // The radio deck mirrors whatever the vendor radio app publishes as a media
     // session, and parses band and frequency out of its title and artist. A
     // session is not a declared component, so the only way to know whether one
