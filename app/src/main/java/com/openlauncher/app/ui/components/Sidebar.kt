@@ -358,7 +358,7 @@ private fun ShortcutSlot(
                     Icon(
                         Icons.Default.Apps,
                         contentDescription = shortcut.label,
-                        tint               = tint,
+                        tint               = iconInactive,
                         modifier           = Modifier.size(ICON_SIZE)
                     )
                 }
