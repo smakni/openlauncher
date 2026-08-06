@@ -11,6 +11,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,6 +133,11 @@ fun MapWidget(
         }
     }
 
+    // Drawn only once the style has actually loaded and a fix exists. The marker
+    // used to sit over a blank widget while tiles were still arriving, claiming a
+    // position on a map that was not there.
+    var styleReady by remember { mutableStateOf(false) }
+
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = {
@@ -142,7 +150,7 @@ fun MapWidget(
             update = { view ->
                 view.getMapAsync { map ->
                     if (map.style == null) {
-                        map.setStyle(Style.Builder().fromUri(styleUri))
+                        map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
                         map.uiSettings.apply {
                             isAttributionEnabled = false
                             isLogoEnabled = false
@@ -174,7 +182,7 @@ fun MapWidget(
         // Drawn over the map rather than added as a layer: the camera is centred
         // on the vehicle and turned to its heading, so the centre of the widget
         // is the vehicle by construction, and an arrow there is always right.
-        Canvas(modifier = Modifier.size(22.dp)) {
+        if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
             val arrow = Path().apply {
                 moveTo(size.width / 2f, 0f)
                 lineTo(size.width * 0.18f, size.height)
