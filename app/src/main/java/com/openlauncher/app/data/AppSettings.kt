@@ -119,6 +119,11 @@ data class AppSettings(
     val showVitals: Boolean = false,
     val showTripTracker: Boolean = false,
     val compassOffset: Float = 0f,
+    // Last heading seen, kept across restarts. Heading only updates while
+    // moving, so without this a unit that has just booted shows due north until
+    // the car is driven — which reads as a broken compass rather than an unknown
+    // one.
+    val lastBearing: Float = 0f,
     val showSoundboard: Boolean = false,
     val soundboardPads: List<SoundPadConfig> = defaultSoundboardPads(),
     val vitalsAsBars: Boolean = false,

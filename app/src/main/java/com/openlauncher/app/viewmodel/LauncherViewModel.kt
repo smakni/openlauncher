@@ -40,6 +40,9 @@ import com.openlauncher.app.util.LocationData
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
+/** Smallest heading change worth writing to storage, in degrees. */
+private const val BEARING_SAVE_DELTA = 10f
+
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsRepo = SettingsRepository(application)
@@ -511,7 +514,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    fun startLocationUpdates() = locationMgr.start()
+    fun startLocationUpdates() {
+        locationMgr.restoreBearing(settings.value.lastBearing)
+        locationMgr.start()
+    }
     fun stopLocationUpdates()  = locationMgr.stop()
 
     // ── Connectivity ──────────────────────────────────────────────────────────
@@ -748,6 +754,20 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         loadInstalledApps()
         refreshConnectivity()
         if (hasSzchoicewayMcu) startHardwareRadioObserver()
+
+        // Persist the heading, but sparingly: fixes arrive every second and
+        // writing each one would hammer the store for a value only read at
+        // startup. A ten degree move is the smallest worth remembering.
+        viewModelScope.launch {
+            var saved = 0f
+            locationMgr.bearing.collect { current ->
+                val delta = kotlin.math.abs(((current - saved + 540f) % 360f) - 180f)
+                if (delta >= BEARING_SAVE_DELTA) {
+                    saved = current
+                    settingsRepo.updateSettings { it.copy(lastBearing = current) }
+                }
+            }
+        }
 
         // Follow the OBD settings rather than starting the link once: changing the
         // adapter or the fuel type has to rebuild the connection, and turning the

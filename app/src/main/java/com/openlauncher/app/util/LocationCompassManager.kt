@@ -123,6 +123,22 @@ class LocationCompassManager(context: Context) {
         override fun onProviderDisabled(provider: String) {}
     }
 
+    /**
+     * Seeds the heading from the last one known.
+     *
+     * Heading only updates while moving, so a freshly started unit would
+     * otherwise read due north until the car is driven — indistinguishable from
+     * a compass that does not work.
+     */
+    fun restoreBearing(degrees: Float) {
+        if (_bearing.value == 0f && degrees != 0f) {
+            val radians = Math.toRadians(degrees.toDouble())
+            bearingSin = sin(radians).toFloat()
+            bearingCos = cos(radians).toFloat()
+            _bearing.value = degrees
+        }
+    }
+
     fun start() {
         // Sensors
         sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let {
