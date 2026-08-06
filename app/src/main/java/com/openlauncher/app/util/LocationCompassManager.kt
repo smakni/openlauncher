@@ -90,23 +90,26 @@ class LocationCompassManager(context: Context) {
                 speedMps  = standstillCorrected(loc)
             )
 
-            // 1. If GPS has a hardware-computed bearing, use it (works offline)
-            if (loc.hasBearing() && loc.bearing != 0f) {
-                _bearing.value = loc.bearing
-            } else {
-                // 2. Math fallback: Calculate bearing between consecutive location points (works offline & sensor-less!)
-                val lastLoc = lastLocationForBearing
-                if (lastLoc != null) {
-                    val distance = lastLoc.distanceTo(loc)
-                    // Ensure the distance is enough to overcome GPS jitter (e.g. 3 meters)
-                    if (distance > 3f) {
-                        val computedBearing = lastLoc.bearingTo(loc)
-                        // Normalize bearing to 0-360
-                        _bearing.value = (computedBearing + 360f) % 360f
+            // Heading only means anything while the car is moving. A stationary
+            // receiver keeps reporting one and it wanders, which had the compass
+            // turning on a parked car, so the noise-gated speed doubles as the
+            // movement test. Standing still simply holds the last heading.
+            if (standstillCorrected(loc) > 0f) {
+                if (loc.hasBearing()) {
+                    // Tested with hasBearing alone: the old check also rejected a
+                    // bearing of exactly 0, discarding a valid due-north heading.
+                    smoothBearing(loc.bearing)
+                } else {
+                    // No hardware bearing — derive it from consecutive positions.
+                    // Works offline and without sensors, which is the only path
+                    // available on units that ship without a magnetometer.
+                    val lastLoc = lastLocationForBearing
+                    if (lastLoc == null) {
+                        lastLocationForBearing = loc
+                    } else if (lastLoc.distanceTo(loc) > BEARING_MIN_DISTANCE_M) {
+                        smoothBearing(lastLoc.bearingTo(loc))
                         lastLocationForBearing = loc
                     }
-                } else {
-                    lastLocationForBearing = loc
                 }
             }
         }
@@ -160,6 +163,29 @@ class LocationCompassManager(context: Context) {
     }
 
     /**
+     * Feeds a heading through the circular low-pass filter and publishes it.
+     *
+     * The filter was previously only reachable from the sensor listener, so on a
+     * unit without a magnetometer — where GPS is the only source there is — the
+     * compass received raw values and jumped between fixes.
+     *
+     * Filtering sine and cosine rather than the angle is what keeps 359 degrees
+     * and 1 degree adjacent; averaging the numbers directly would sweep the
+     * needle the long way round through south.
+     *
+     * A far higher weight than the sensor path uses: fixes arrive about once a
+     * second instead of sixty times, and the sensor's weight at that rate would
+     * take the better part of a minute to follow a turn.
+     */
+    private fun smoothBearing(degrees: Float) {
+        val radians = Math.toRadians(degrees.toDouble())
+        bearingSin = GPS_BEARING_ALPHA * sin(radians).toFloat() + (1f - GPS_BEARING_ALPHA) * bearingSin
+        bearingCos = GPS_BEARING_ALPHA * cos(radians).toFloat() + (1f - GPS_BEARING_ALPHA) * bearingCos
+        _bearing.value =
+            ((Math.toDegrees(atan2(bearingSin.toDouble(), bearingCos.toDouble())) + 360) % 360).toFloat()
+    }
+
+    /**
      * GPS speed with standstill noise removed.
      *
      * A receiver parked still reports a metre or so per second of drift, and with
@@ -198,5 +224,11 @@ class LocationCompassManager(context: Context) {
 
         /** ~2.5 km/h — under walking pace, so real movement is never masked. */
         const val STANDSTILL_FLOOR_MPS = 0.7f
+
+        /** Metres between fixes before a derived heading is trusted over GPS scatter. */
+        const val BEARING_MIN_DISTANCE_M = 3f
+
+        /** Filter weight for GPS headings, which arrive per second rather than per frame. */
+        const val GPS_BEARING_ALPHA = 0.45f
     }
 }
