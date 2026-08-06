@@ -81,6 +81,7 @@ fun SettingsScreen(
     // with a message that did not, so the save branch was unreachable.
     var syuProbeRunning by remember { mutableStateOf(false) }
     var showSyuLive by remember { mutableStateOf(false) }
+    var canDbResult by remember { mutableStateOf<String?>(null) }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -1020,6 +1021,25 @@ fun SettingsScreen(
                         syuProbeRunning = true
                         syuProbeStatus = "sweeping — press again in ~20s to save"
                     }
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Dump CAN Database",
+                sublabel = canDbResult ?: "Reads the vendor id table out of protocolupdate",
+                icon     = Icons.Default.Storage,
+                accent   = accent,
+                onClick  = {
+                    canDbResult = runCatching {
+                        val text = com.openlauncher.app.util.CanbusDbDumper.dump(context)
+                        val dir = java.io.File(context.getExternalFilesDir(null), "vendor")
+                            .apply { mkdirs() }
+                        val file = java.io.File(dir, "canbus-db.txt")
+                        file.writeText(text)
+                        "saved to ${file.absolutePath}"
+                    }.getOrElse { "failed: ${it.javaClass.simpleName}" }
                 }
             )
 

@@ -200,8 +200,12 @@ class SyuProbe(private val context: Context) {
         const val TOOLKIT_PACKAGE = "com.syu.ms"
         const val TOOLKIT_ACTION = "com.syu.ms.toolkit"
 
-        /** Swept blind: neither the module count nor the id range is documented. */
-        const val MODULE_COUNT = 12
+        /**
+         * Covers the four documented interfaces: 0 Main, 4 Sound, 7 Canbus and
+         * 14 CanUp. The earlier ceiling of 12 stopped short of CanUp entirely,
+         * so nothing it carries was ever seen.
+         */
+        const val MODULE_COUNT = 16
         const val ID_COUNT = 256
     }
 }
