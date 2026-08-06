@@ -137,6 +137,10 @@ data class AppSettings(
     // changing when a build is retired — hence a setting rather than a constant.
     val pmtilesUrl: String = "https://build.protomaps.com/20260801.pmtiles",
     val offlineMapRadiusKm: Int = 25,
+    // A ZXY template, when set, replaces the PMTiles source. It is what makes
+    // region download possible at all: the downloader enumerates per-tile URLs,
+    // which an archive addressed by byte range does not have.
+    val tileUrlTemplate: String = "",
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,

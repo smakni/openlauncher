@@ -924,11 +924,51 @@ fun SettingsScreen(
 
             SettingsDivider()
 
+            run {
+                var tileUrlInput by remember(settings.tileUrlTemplate) {
+                    mutableStateOf(settings.tileUrlTemplate)
+                }
+                SettingsRow(
+                    label    = "Tile URL",
+                    sublabel = if (settings.tileUrlTemplate.isBlank())
+                        "Empty = PMTiles archive. Set one to enable region download."
+                    else "ZXY source active — region download available",
+                    icon     = Icons.Default.Link
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value         = tileUrlInput,
+                            onValueChange = { tileUrlInput = it },
+                            placeholder   = {
+                                Text("https://.../{z}/{x}/{y}.mvt?key=", fontSize = 10.sp)
+                            },
+                            singleLine    = true,
+                            textStyle     = LocalTextStyle.current.copy(fontSize = 10.sp),
+                            colors        = outlinedFieldColors(accent),
+                            modifier      = Modifier.width(300.dp)
+                        )
+                        if (tileUrlInput != settings.tileUrlTemplate) {
+                            IconButton(
+                                onClick = { onUpdate { copy(tileUrlTemplate = tileUrlInput.trim()) } },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(Icons.Default.Check, "Save", tint = accent,
+                                     modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            SettingsDivider()
+
             SettingsButton(
                 label    = "Download Map Around Me",
                 sublabel = when (val d = mapDownload) {
                     is com.openlauncher.app.util.DownloadState.Idle ->
-                        "Only works with a tile-URL source, not a PMTiles archive"
+                        if (settings.tileUrlTemplate.isBlank())
+                            "Set a Tile URL above — a PMTiles archive cannot be enumerated"
+                        else "Needs a GPS fix and a connection"
                     is com.openlauncher.app.util.DownloadState.Running ->
                         "${d.percent}% — ${d.megabytes} MB — ${d.completed}/${d.required} tiles"
                     is com.openlauncher.app.util.DownloadState.Done -> "Done — ${d.megabytes} MB stored"

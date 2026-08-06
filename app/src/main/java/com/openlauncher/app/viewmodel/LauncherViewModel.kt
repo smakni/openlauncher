@@ -60,13 +60,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
      */
     fun mapStyleUri(): String = runCatching {
         com.openlauncher.app.util.OfflineMapStore.resolvedStyleUri(
-            getApplication(), settings.value.pmtilesUrl
+            getApplication(), settings.value.pmtilesUrl, settings.value.tileUrlTemplate
         )
     }.getOrDefault("")
 
     fun hasMapData(): Boolean = runCatching {
         com.openlauncher.app.util.OfflineMapStore.hasAnySource(
-            getApplication(), settings.value.pmtilesUrl
+            getApplication(), settings.value.pmtilesUrl, settings.value.tileUrlTemplate
         )
     }.getOrDefault(false)
 

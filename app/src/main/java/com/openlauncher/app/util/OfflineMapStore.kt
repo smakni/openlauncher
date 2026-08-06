@@ -87,19 +87,33 @@ object OfflineMapStore {
      * pull from. A downloaded region lives in MapLibre's own store rather than
      * as a file here, so the archive alone is not the test.
      */
-    fun hasAnySource(context: Context, remotePmTilesUrl: String): Boolean =
-        installedPmTiles(context) != null || remotePmTilesUrl.isNotBlank()
+    fun hasAnySource(
+        context: Context,
+        remotePmTilesUrl: String,
+        tileUrlTemplate: String = ""
+    ): Boolean =
+        installedPmTiles(context) != null ||
+            remotePmTilesUrl.isNotBlank() ||
+            tileUrlTemplate.isNotBlank()
 
-    fun resolvedStyleUri(context: Context, remotePmTilesUrl: String): String {
+    fun resolvedStyleUri(
+        context: Context,
+        remotePmTilesUrl: String,
+        tileUrlTemplate: String = ""
+    ): String {
         val archive = installedPmTiles(context)
-        val source = if (archive != null) {
-            "pmtiles://file://${archive.absolutePath}"
-        } else {
-            "pmtiles://$remotePmTilesUrl"
+        // A tile template wins over everything: it is the only source the region
+        // downloader can enumerate, so choosing it is choosing that feature.
+        // Otherwise an installed archive beats the remote build, being local.
+        val sourceJson = when {
+            tileUrlTemplate.isNotBlank() ->
+                """"tiles": ["${tileUrlTemplate.replace("\"", "\\\"")}"], "maxzoom": 15"""
+            archive != null -> """"url": "pmtiles://file://${archive.absolutePath}""""
+            else            -> """"url": "pmtiles://$remotePmTilesUrl""""
         }
         val styleFile = File(baseDir(context), "style.json")
         val json = context.assets.open("map-style.json").bufferedReader().use { it.readText() }
-        styleFile.writeText(json.replace("__PMTILES_URL__", source))
+        styleFile.writeText(json.replace("\"url\": \"__PMTILES_URL__\"", sourceJson))
         return "file://${styleFile.absolutePath}"
     }
 
