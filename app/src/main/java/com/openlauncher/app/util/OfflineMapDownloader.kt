@@ -15,7 +15,15 @@ import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
 /** Progress of a region download, or why there is none. */
 sealed interface DownloadState {
     data object Idle : DownloadState
-    data class Running(val percent: Int, val megabytes: Long) : DownloadState
+    data class Running(
+        val percent: Int,
+        val megabytes: Long,
+        // Reported so a stalled download can be told apart from one that
+        // never had anything to fetch: a required count stuck at zero means
+        // the style yielded no tiles to enumerate, not that it is slow.
+        val completed: Long,
+        val required: Long
+    ) : DownloadState
     data class Done(val megabytes: Long) : DownloadState
     data class Failed(val reason: String) : DownloadState
 }
@@ -60,7 +68,7 @@ class OfflineMapDownloader(private val context: Context) {
             _state.value = DownloadState.Failed("map engine unavailable")
             return
         }
-        _state.value = DownloadState.Running(0, 0)
+        _state.value = DownloadState.Running(0, 0, 0, 0)
 
         val definition = OfflineTilePyramidRegionDefinition(
             styleUrl,
@@ -91,7 +99,12 @@ class OfflineMapDownloader(private val context: Context) {
                                     (100.0 * status.completedResourceCount /
                                         status.requiredResourceCount).toInt()
                                 } else 0
-                                DownloadState.Running(percent.coerceIn(0, 100), megabytes)
+                                DownloadState.Running(
+                                    percent.coerceIn(0, 100),
+                                    megabytes,
+                                    status.completedResourceCount,
+                                    status.requiredResourceCount
+                                )
                             }
                         }
 

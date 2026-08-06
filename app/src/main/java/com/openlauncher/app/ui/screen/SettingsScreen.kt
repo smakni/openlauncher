@@ -922,7 +922,8 @@ fun SettingsScreen(
                 label    = "Download Map Around Me",
                 sublabel = when (val d = mapDownload) {
                     is com.openlauncher.app.util.DownloadState.Idle -> "Needs a GPS fix and a connection"
-                    is com.openlauncher.app.util.DownloadState.Running -> "${d.percent}% — ${d.megabytes} MB"
+                    is com.openlauncher.app.util.DownloadState.Running ->
+                        "${d.percent}% — ${d.megabytes} MB — ${d.completed}/${d.required} tiles"
                     is com.openlauncher.app.util.DownloadState.Done -> "Done — ${d.megabytes} MB stored"
                     is com.openlauncher.app.util.DownloadState.Failed -> "Failed: ${d.reason}"
                 },
