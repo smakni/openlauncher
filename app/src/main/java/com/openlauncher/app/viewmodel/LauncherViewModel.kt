@@ -256,6 +256,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "TRIP_TRACKER" -> copy(showTripTracker = true)
                 "SOUNDBOARD"  -> copy(showSoundboard = true)
                 "VEHICLE"     -> copy(showVehicle = true)
+                "MAP"         -> copy(showMap = true)
                 "APP_SHORTCUT_1" -> copy(showAppShortcut1 = true)
                 "APP_SHORTCUT_2" -> copy(showAppShortcut2 = true)
                 else          -> this
@@ -290,6 +291,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "TRIP_TRACKER" -> copy(showTripTracker = false)
                 "SOUNDBOARD"  -> copy(showSoundboard = false)
                 "VEHICLE"     -> copy(showVehicle = false)
+                "MAP"         -> copy(showMap = false)
                 "APP_SHORTCUT_1" -> copy(showAppShortcut1 = false)
                 "APP_SHORTCUT_2" -> copy(showAppShortcut2 = false)
                 else          -> this

@@ -67,6 +67,7 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads"),
     WidgetTypeInfo("VEHICLE",     "VEHICLE",     Icons.Default.DirectionsCar, "Live engine data (OBD-II)"),
+    WidgetTypeInfo("MAP",         "MAP",         Icons.Default.Map,           "Position on an OpenStreetMap view"),
     WidgetTypeInfo("APP_SHORTCUT_1", "APP 1",    Icons.Default.Apps,          "Shortcut to an app"),
     WidgetTypeInfo("APP_SHORTCUT_2", "APP 2",    Icons.Default.Apps,          "Shortcut to an app")
 )
@@ -83,6 +84,7 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
+        if (settings.showMap) add("MAP")
         if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
         if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
@@ -260,6 +262,7 @@ fun HomeScreen(
                 if (settings.showTripTracker) add("TRIP_TRACKER")
                 if (settings.showSoundboard) add("SOUNDBOARD")
                 if (settings.showVehicle) add("VEHICLE")
+        if (settings.showMap) add("MAP")
         if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
                 if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
             }
@@ -337,6 +340,7 @@ fun HomeScreen(
                     "SPEEDOMETER" -> "SPEED"
                     "TRIP_TRACKER" -> "TRIP"
                     "SOUNDBOARD"  -> "SOUND"
+                    "MAP"         -> "MAP"
                     "VEHICLE"     -> "VEHICLE"
                     "APP_SHORTCUT_1" -> settings.appShortcutTiles.getOrNull(0)
                         ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 1"
@@ -496,6 +500,14 @@ fun HomeScreen(
                             isDayMode = isDayMode,
                             isEditing = editMode,
                             onUpdatePad = onUpdateSoundPad,
+                            modifier  = Modifier.fillMaxSize()
+                        )
+                        "MAP" -> MapWidget(
+                            location  = location,
+                            bearing   = bearing,
+                            accent    = accent,
+                            isDayMode = isDayMode,
+                            isEditing = editMode,
                             modifier  = Modifier.fillMaxSize()
                         )
                         "VEHICLE" -> VehicleWidget(
@@ -886,6 +898,7 @@ private fun WidgetLibraryDialog(
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
+        if (settings.showMap) add("MAP")
         if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
         if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }

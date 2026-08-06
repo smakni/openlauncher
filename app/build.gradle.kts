@@ -104,6 +104,11 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Map rendering. OpenStreetMap tiles, which are meant to be consumed this
+    // way — unlike the Google endpoints an earlier map widget pulled from, which
+    // is what had it reverted upstream.
+    implementation("org.osmdroid:osmdroid-android:6.1.20")
+
     // Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.37.3")
 

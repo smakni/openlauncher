@@ -131,6 +131,7 @@ data class AppSettings(
     val obdDeviceMac: String = "",
     val obdDeviceName: String = "",
     val fuelType: FuelType = FuelType.PETROL,
+    val showMap: Boolean = false,
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,
@@ -170,6 +171,7 @@ fun AppSettings.activeWidgetIds(): Set<String> = buildSet {
     if (showTripTracker) add("TRIP_TRACKER")
     if (showSoundboard) add("SOUNDBOARD")
     if (showVehicle) add("VEHICLE")
+    if (showMap) add("MAP")
     if (showAppShortcut1) add("APP_SHORTCUT_1")
     if (showAppShortcut2) add("APP_SHORTCUT_2")
 }
