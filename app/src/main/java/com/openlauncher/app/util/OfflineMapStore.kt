@@ -70,6 +70,39 @@ object OfflineMapStore {
             ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED }
             ?.minByOrNull { if (it.extension.lowercase() == "pmtiles") 0 else 1 }
 
+    /**
+     * Writes the bundled style out with its source resolved, and returns a URI
+     * MapLibre can fetch.
+     *
+     * Both the map view and the region downloader need to name the same style,
+     * and the downloader can only take a URL — an asset with an unresolved
+     * placeholder is no use to it. Materialising the patched copy once gives
+     * both a single file to point at.
+     *
+     * An installed archive wins over the remote build: it is already on the
+     * device, so it costs nothing to read and works with no connection at all.
+     */
+    /**
+     * Whether anything can be drawn: an archive on disk, or a remote build to
+     * pull from. A downloaded region lives in MapLibre's own store rather than
+     * as a file here, so the archive alone is not the test.
+     */
+    fun hasAnySource(context: Context, remotePmTilesUrl: String): Boolean =
+        installedPmTiles(context) != null || remotePmTilesUrl.isNotBlank()
+
+    fun resolvedStyleUri(context: Context, remotePmTilesUrl: String): String {
+        val archive = installedPmTiles(context)
+        val source = if (archive != null) {
+            "pmtiles://file://${archive.absolutePath}"
+        } else {
+            "pmtiles://$remotePmTilesUrl"
+        }
+        val styleFile = File(baseDir(context), "style.json")
+        val json = context.assets.open("map-style.json").bufferedReader().use { it.readText() }
+        styleFile.writeText(json.replace("__PMTILES_URL__", source))
+        return "file://${styleFile.absolutePath}"
+    }
+
     fun remove(context: Context, name: String): Boolean =
         File(baseDir(context), name).takeIf { it.isFile }?.delete() ?: false
 

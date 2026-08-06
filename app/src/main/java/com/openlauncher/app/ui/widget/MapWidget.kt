@@ -1,6 +1,5 @@
 package com.openlauncher.app.ui.widget
 
-import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -18,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
-import com.openlauncher.app.util.OfflineMapStore
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
@@ -44,15 +42,16 @@ private const val DEFAULT_ZOOM = 15.0
 fun MapWidget(
     location: LocationData?,
     bearing: Float,
+    styleUri: String,
+    hasMapData: Boolean,
     accent: Color,
     isDayMode: Boolean = false,
     isEditing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val archive = remember { OfflineMapStore.installedPmTiles(context) }
 
-    if (archive == null) {
+    if (!hasMapData) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
                 text = "NO MAP ARCHIVE\nSettings › Maintenance › Offline Map Archive",
@@ -94,7 +93,7 @@ fun MapWidget(
                 // rather than panning the map underneath it.
                 view.setOnTouchListener { _, _ -> isEditing }
                 view.getMapAsync { map ->
-                    map.setStyle(Style.Builder().fromJson(styleJson(context, archive)))
+                    map.setStyle(Style.Builder().fromUri(styleUri))
                     map.uiSettings.apply {
                         isAttributionEnabled = false
                         isLogoEnabled = false
@@ -116,14 +115,3 @@ fun MapWidget(
         )
     }
 }
-
-/**
- * Loads the bundled style and points its source at the installed archive.
- *
- * The path is only known at runtime, so the asset carries a placeholder rather
- * than a real URL. The pmtiles:// prefix is what tells MapLibre to read the file
- * as an archive instead of treating it as a tile endpoint.
- */
-private fun styleJson(context: Context, archive: java.io.File): String =
-    context.assets.open("map-style.json").bufferedReader().use { it.readText() }
-        .replace("__PMTILES_URL__", "pmtiles://file://${archive.absolutePath}")

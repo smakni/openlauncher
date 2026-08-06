@@ -46,6 +46,36 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     private val locationMgr  = LocationCompassManager(application)
     private val obdMgr       = ObdManager(application)
 
+    // ── Offline map ───────────────────────────────────────────────────────────
+    private val mapDownloader = com.openlauncher.app.util.OfflineMapDownloader(application)
+    val mapDownload: StateFlow<com.openlauncher.app.util.DownloadState> = mapDownloader.state
+
+    /**
+     * Style URI with its tile source resolved. Rewritten on each call because an
+     * archive can be imported, or the remote build changed, between calls.
+     */
+    fun mapStyleUri(): String =
+        com.openlauncher.app.util.OfflineMapStore.resolvedStyleUri(
+            getApplication(), settings.value.pmtilesUrl
+        )
+
+    fun hasMapData(): Boolean =
+        com.openlauncher.app.util.OfflineMapStore.hasAnySource(
+            getApplication(), settings.value.pmtilesUrl
+        )
+
+    /** Downloads the area around the last fix; without one there is no centre. */
+    fun downloadMapAroundMe() {
+        val fix = locationMgr.location.value ?: return
+        mapDownloader.download(
+            styleUrl = mapStyleUri(),
+            centre   = org.maplibre.android.geometry.LatLng(fix.latitude, fix.longitude),
+            radiusKm = settings.value.offlineMapRadiusKm.toDouble()
+        )
+    }
+
+    fun clearDownloadedMaps() = mapDownloader.clear()
+
     // ── OBD-II ────────────────────────────────────────────────────────────────
     val vehicle:   StateFlow<VehicleState> = obdMgr.vehicle
     val obdStatus: StateFlow<ObdStatus>    = obdMgr.status

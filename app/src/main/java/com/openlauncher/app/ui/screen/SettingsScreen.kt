@@ -59,6 +59,10 @@ fun SettingsScreen(
     onReset: () -> Unit,
     obdStatus: ObdStatus = ObdStatus.DISABLED,
     pairedObdAdapters: () -> List<Pair<String, String>> = { emptyList() },
+    mapDownload: com.openlauncher.app.util.DownloadState =
+        com.openlauncher.app.util.DownloadState.Idle,
+    onDownloadMap: () -> Unit = {},
+    onClearMaps: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -871,6 +875,53 @@ fun SettingsScreen(
 
         // ── Maintenance ──────────────────────────────────────────────────────
         SettingsSection("Maintenance") {
+            SettingsRow(
+                label    = "Offline Map Radius",
+                sublabel = "Area downloaded around the current position",
+                icon     = Icons.Default.Straighten
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(10, 25, 50).forEach { km ->
+                        FilterChip(
+                            selected = settings.offlineMapRadiusKm == km,
+                            onClick  = { onUpdate { copy(offlineMapRadiusKm = km) } },
+                            label    = { Text("$km km", fontSize = 9.sp, letterSpacing = 0.5.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Download Map Around Me",
+                sublabel = when (val d = mapDownload) {
+                    is com.openlauncher.app.util.DownloadState.Idle -> "Needs a GPS fix and a connection"
+                    is com.openlauncher.app.util.DownloadState.Running -> "${d.percent}% — ${d.megabytes} MB"
+                    is com.openlauncher.app.util.DownloadState.Done -> "Done — ${d.megabytes} MB stored"
+                    is com.openlauncher.app.util.DownloadState.Failed -> "Failed: ${d.reason}"
+                },
+                icon     = Icons.Default.CloudDownload,
+                accent   = accent,
+                onClick  = onDownloadMap
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Clear Downloaded Maps",
+                sublabel = "Frees the offline map store",
+                icon     = Icons.Default.DeleteSweep,
+                accent   = accent,
+                onClick  = onClearMaps
+            )
+
+            SettingsDivider()
+
             SettingsButton(
                 label    = "Offline Map Archive",
                 sublabel = offlineMaps.ifEmpty { listOf("None — map falls back to cached tiles") }

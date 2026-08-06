@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
             val weather     by vm.weather.collectAsStateWithLifecycle()
             val location    by vm.location.collectAsStateWithLifecycle()
             val obdStatus   by vm.obdStatus.collectAsStateWithLifecycle()
+            val mapDownload by vm.mapDownload.collectAsStateWithLifecycle()
             val vehicle     by vm.vehicle.collectAsStateWithLifecycle()
             val bearing     by vm.compassBearing.collectAsStateWithLifecycle()
             val isWifi      by vm.isWifi.collectAsStateWithLifecycle()
@@ -204,6 +205,8 @@ class MainActivity : ComponentActivity() {
                                         installedIconFor    = { pkg -> apps.find { it.packageName == pkg }?.icon },
                                         onLaunchApp         = { pkg -> vm.launchApp(pkg) },
                                         onAssignAppTile     = { index -> vm.startAppTilePicker(index) },
+                                        mapStyleUri         = vm.mapStyleUri(),
+                                        hasMapData          = vm.hasMapData(),
                                         vehicle             = vehicle,
                                         obdStatus           = obdStatus,
                                         settings            = settings,
@@ -274,7 +277,10 @@ class MainActivity : ComponentActivity() {
                                         onUpdate  = { block -> vm.updateSettings(block) },
                                         onReset   = { vm.resetSettings() },
                                         obdStatus = obdStatus,
-                                        pairedObdAdapters = { vm.pairedObdAdapters() }
+                                        pairedObdAdapters = { vm.pairedObdAdapters() },
+                                        mapDownload = mapDownload,
+                                        onDownloadMap = { vm.downloadMapAroundMe() },
+                                        onClearMaps = { vm.clearDownloadedMaps() }
                                     )
                                 }
                             }

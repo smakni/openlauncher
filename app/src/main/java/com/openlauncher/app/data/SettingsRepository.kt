@@ -65,6 +65,8 @@ class SettingsRepository(private val context: Context) {
         val OBD_DEVICE_NAME       = stringPreferencesKey("obd_device_name")
         val FUEL_TYPE             = stringPreferencesKey("fuel_type")
         val SHOW_MAP              = booleanPreferencesKey("show_map")
+        val PMTILES_URL           = stringPreferencesKey("pmtiles_url")
+        val MAP_RADIUS_KM         = intPreferencesKey("map_radius_km")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
         val SHOW_APP_SHORTCUT_1   = booleanPreferencesKey("show_app_shortcut_1")
         val SHOW_APP_SHORTCUT_2   = booleanPreferencesKey("show_app_shortcut_2")
@@ -153,6 +155,8 @@ class SettingsRepository(private val context: Context) {
                 obdDeviceName    = prefs[Keys.OBD_DEVICE_NAME] ?: defaults.obdDeviceName,
                 fuelType         = prefs[Keys.FUEL_TYPE]?.let { runCatching { FuelType.valueOf(it) }.getOrNull() } ?: defaults.fuelType,
                 showMap          = prefs[Keys.SHOW_MAP] ?: defaults.showMap,
+                pmtilesUrl       = prefs[Keys.PMTILES_URL] ?: defaults.pmtilesUrl,
+                offlineMapRadiusKm = prefs[Keys.MAP_RADIUS_KM] ?: defaults.offlineMapRadiusKm,
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
                 showAppShortcut1 = prefs[Keys.SHOW_APP_SHORTCUT_1] ?: defaults.showAppShortcut1,
                 showAppShortcut2 = prefs[Keys.SHOW_APP_SHORTCUT_2] ?: defaults.showAppShortcut2,
@@ -222,6 +226,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.OBD_DEVICE_NAME]    = s.obdDeviceName
             prefs[Keys.FUEL_TYPE]          = s.fuelType.name
             prefs[Keys.SHOW_MAP]            = s.showMap
+            prefs[Keys.PMTILES_URL]         = s.pmtilesUrl
+            prefs[Keys.MAP_RADIUS_KM]       = s.offlineMapRadiusKm
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
             prefs[Keys.SHOW_APP_SHORTCUT_1] = s.showAppShortcut1
             prefs[Keys.SHOW_APP_SHORTCUT_2] = s.showAppShortcut2

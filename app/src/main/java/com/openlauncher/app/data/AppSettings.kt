@@ -132,6 +132,11 @@ data class AppSettings(
     val obdDeviceName: String = "",
     val fuelType: FuelType = FuelType.PETROL,
     val showMap: Boolean = false,
+    // Remote PMTiles build the map falls back to, and downloads regions from.
+    // Protomaps publish these daily and name them by date, so this needs
+    // changing when a build is retired — hence a setting rather than a constant.
+    val pmtilesUrl: String = "https://build.protomaps.com/20260801.pmtiles",
+    val offlineMapRadiusKm: Int = 25,
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,

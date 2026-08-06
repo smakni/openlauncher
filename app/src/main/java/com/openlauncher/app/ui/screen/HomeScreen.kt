@@ -143,6 +143,8 @@ fun HomeScreen(
     onRadioTune: (band: String, freq: Float) -> Unit = { _, _ -> },
     onAssignRadio: () -> Unit = {},
     installedIconFor: (String) -> android.graphics.drawable.Drawable? = { null },
+    mapStyleUri: String = "",
+    hasMapData: Boolean = false,
     onLaunchApp: (String) -> Unit = {},
     onAssignAppTile: (Int) -> Unit = {},
     vehicle: com.openlauncher.app.model.VehicleState = com.openlauncher.app.model.VehicleState(),
@@ -503,8 +505,10 @@ fun HomeScreen(
                             modifier  = Modifier.fillMaxSize()
                         )
                         "MAP" -> MapWidget(
-                            location  = location,
-                            bearing   = bearing,
+                            location   = location,
+                            bearing    = bearing,
+                            styleUri   = mapStyleUri,
+                            hasMapData = hasMapData,
                             accent    = accent,
                             isDayMode = isDayMode,
                             isEditing = editMode,
