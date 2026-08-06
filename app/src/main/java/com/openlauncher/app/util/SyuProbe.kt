@@ -132,19 +132,37 @@ class SyuProbe(private val context: Context) {
     fun writeReport(): String = runCatching {
         val dir = File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
         val file = File(dir, "syu-probe.txt")
-        val snapshot = synchronized(readings) { readings.values.toList() }
+        val (snapshot, events) = synchronized(readings) {
+            readings.values.toList() to timeline.toList()
+        }
+
+        fun StringBuilder.appendReading(r: Reading) {
+            append("m%-3d id%-5d".format(r.module, r.id))
+            if (r.ints.isNotEmpty()) append(" ints=${r.ints}")
+            if (r.floats.isNotEmpty()) append(" floats=${r.floats}")
+            if (r.strings.isNotEmpty()) append(" strings=${r.strings}")
+        }
+
         file.writeText(buildString {
-            append("SYU probe — ${snapshot.size} responding ids\n")
-            append("=".repeat(44)).append('\n')
+            append("SYU probe — ${snapshot.size} ids, ${events.size} changes\n")
+            append("=".repeat(52)).append('\n')
+
+            // The timeline is the part that identifies anything: an id that moved
+            // at the moment something was switched is the id for that thing.
+            append("\nTIMELINE (seconds from start)\n")
+            events.forEach { (elapsed, r) ->
+                append("%7.1f  ".format(elapsed / 1000.0))
+                appendReading(r)
+                append('\n')
+            }
+
+            append("\nFINAL VALUES\n")
             snapshot.sortedWith(compareBy({ it.module }, { it.id })).forEach { r ->
-                append("m%-3d id%-5d".format(r.module, r.id))
-                if (r.ints.isNotEmpty()) append(" ints=${r.ints}")
-                if (r.floats.isNotEmpty()) append(" floats=${r.floats}")
-                if (r.strings.isNotEmpty()) append(" strings=${r.strings}")
+                appendReading(r)
                 append('\n')
             }
         })
-        "${snapshot.size} ids → ${file.absolutePath}"
+        "${snapshot.size} ids, ${events.size} changes → ${file.absolutePath}"
     }.getOrElse { "report failed: ${it.javaClass.simpleName}" }
 
     fun stop() {
