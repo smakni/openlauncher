@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.openlauncher.app.ui.theme.animatedFix
 import com.openlauncher.app.util.LocationData
 import kotlin.math.cos
 import kotlin.math.sin
@@ -28,7 +30,10 @@ fun SpeedometerWidget(
     modifier: Modifier = Modifier
 ) {
     val maxSpeed     = if (isMetric) 200f else 124f
-    val speedDisplay = ((location?.speedMps ?: 0f) * if (isMetric) 3.6f else 2.237f).coerceAtLeast(0f)
+    // Animated between fixes: the raw value arrives once a second and
+    // stepped the needle and the digits in visible jumps.
+    val speedTarget = ((location?.speedMps ?: 0f) * if (isMetric) 3.6f else 2.237f).coerceAtLeast(0f)
+    val speedDisplay by animatedFix(speedTarget)
     val unitLabel    = if (isMetric) "KM/H" else "MPH"
     val trackAlpha   = if (isDayMode) 0.18f else 0.07f
     val tickAlphaMaj = if (isDayMode) 0.50f else 0.28f

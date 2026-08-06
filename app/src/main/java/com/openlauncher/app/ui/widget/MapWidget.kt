@@ -1,5 +1,9 @@
 package com.openlauncher.app.ui.widget
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -19,11 +23,38 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
 private const val DEFAULT_ZOOM = 15.0
+
+/** Matches the roughly one second between GPS fixes, so easing is continuous. */
+private const val CAMERA_EASE_MS = 1000
+
+/**
+ * Keeps the map alive between visits to the home screen.
+ *
+ * MapView is expensive to build and has to reload its style and tiles from
+ * scratch each time, so tying its lifetime to the composition meant a visible
+ * rebuild on every return from another screen. One instance is enough: the grid
+ * allows a single map widget.
+ *
+ * Built against the application context rather than the activity, so holding it
+ * past the activity cannot leak one.
+ */
+private object MapViewHolder {
+    private var instance: MapView? = null
+
+    fun obtain(context: android.content.Context): MapView {
+        MapLibre.getInstance(context.applicationContext)
+        return instance ?: MapView(context.applicationContext).also {
+            it.onCreate(null)
+            instance = it
+        }
+    }
+}
 
 /**
  * Position on a vector map rendered by MapLibre from a PMTiles archive.
@@ -82,40 +113,45 @@ fun MapWidget(
         return
     }
 
-    // Must run before any MapView is constructed. It is idempotent, so calling
-    // it each time the widget appears is safe.
-    remember { MapLibre.getInstance(context) }
-    val mapView = remember { MapView(context) }
+    // Held outside the composition so leaving the home screen does not destroy
+    // it. Scoped to the composable, every trip to settings and back tore the map
+    // down and rebuilt it, which meant waiting for tiles to redraw each time.
+    val mapView = remember { MapViewHolder.obtain(context) }
 
-    // MapView is a plain Android view with its own lifecycle contract; without
-    // these calls it leaks its GL surface and renders nothing after the launcher
-    // has been backgrounded once — which on a head unit is constant.
+    // Started and stopped with the widget, but never destroyed: destroying is
+    // what forced the reload. The surface is released on pause, so nothing is
+    // held while the map is off screen.
     DisposableEffect(Unit) {
-        mapView.onCreate(null)
         mapView.onStart()
         mapView.onResume()
         onDispose {
             mapView.onPause()
             mapView.onStop()
-            mapView.onDestroy()
         }
     }
 
-    Box(modifier = modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { mapView },
+            factory = {
+                // Re-attaching a view that is still parented from its last use
+                // throws, so it is detached before being handed over.
+                (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
+                mapView
+            },
             modifier = Modifier.fillMaxSize(),
             update = { view ->
                 view.getMapAsync { map ->
-                    map.setStyle(Style.Builder().fromUri(styleUri))
-                    map.uiSettings.apply {
-                        isAttributionEnabled = false
-                        isLogoEnabled = false
-                        isCompassEnabled = false
-                        setAllGesturesEnabled(false)
+                    if (map.style == null) {
+                        map.setStyle(Style.Builder().fromUri(styleUri))
+                        map.uiSettings.apply {
+                            isAttributionEnabled = false
+                            isLogoEnabled = false
+                            isCompassEnabled = false
+                            setAllGesturesEnabled(false)
+                        }
                     }
                     location?.let {
-                        map.cameraPosition = CameraPosition.Builder()
+                        val camera = CameraPosition.Builder()
                             .target(LatLng(it.latitude, it.longitude))
                             .zoom(DEFAULT_ZOOM)
                             // The map turns and the vehicle stays pointing up the
@@ -123,9 +159,31 @@ fun MapWidget(
                             // a glance.
                             .bearing(bearing.toDouble())
                             .build()
+                        // Eased across the interval between fixes rather than set
+                        // outright. Assigning the position jumped the map once a
+                        // second; this makes the same data read as movement.
+                        map.easeCamera(
+                            CameraUpdateFactory.newCameraPosition(camera),
+                            CAMERA_EASE_MS
+                        )
                     }
                 }
             }
         )
+
+        // Drawn over the map rather than added as a layer: the camera is centred
+        // on the vehicle and turned to its heading, so the centre of the widget
+        // is the vehicle by construction, and an arrow there is always right.
+        Canvas(modifier = Modifier.size(22.dp)) {
+            val arrow = Path().apply {
+                moveTo(size.width / 2f, 0f)
+                lineTo(size.width * 0.18f, size.height)
+                lineTo(size.width / 2f, size.height * 0.72f)
+                lineTo(size.width * 0.82f, size.height)
+                close()
+            }
+            drawPath(arrow, accent)
+            drawPath(arrow, Color.Black, style = Stroke(width = 2f))
+        }
     }
 }
