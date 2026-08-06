@@ -13,12 +13,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
+import com.openlauncher.app.util.OfflineMapStore
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
-import java.io.File
 
 private const val DEFAULT_ZOOM = 16.0
 
@@ -85,8 +85,11 @@ private fun createMapView(context: Context): MapView {
     // OSM's tile policy requires an identifying user agent; the default value
     // gets requests rejected outright.
     config.userAgentValue = context.packageName
-    config.osmdroidBasePath = File(context.filesDir, "osmdroid").apply { mkdirs() }
-    config.osmdroidTileCache = File(config.osmdroidBasePath, "tiles").apply { mkdirs() }
+    // Shared with OfflineMapStore, which is what makes an imported archive
+    // visible here: osmdroid scans this directory and serves any archive it
+    // finds before going to the network.
+    config.osmdroidBasePath = OfflineMapStore.baseDir(context)
+    config.osmdroidTileCache = OfflineMapStore.tileCacheDir(context)
     // Deliberately modest. A cache large enough to hold a region would amount to
     // bulk downloading, which the tile policy forbids; offline coverage belongs
     // in an offline archive instead.

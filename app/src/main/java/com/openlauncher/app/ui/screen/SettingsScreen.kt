@@ -41,6 +41,7 @@ import com.openlauncher.app.model.FuelType
 import com.openlauncher.app.model.ObdStatus
 import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.ui.theme.contrastOn
+import com.openlauncher.app.util.OfflineMapStore
 import com.openlauncher.app.util.SunriseSunset
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -64,6 +65,21 @@ fun SettingsScreen(
     var showResetDialog       by remember { mutableStateOf(false) }
     var showObdPicker         by remember { mutableStateOf(false) }
     var showDiagnostics       by remember { mutableStateOf(false) }
+
+    // Listed from disk rather than from settings: the archive is a file, and a
+    // stored name would go stale the moment one is deleted outside the app.
+    var offlineMaps by remember { mutableStateOf(OfflineMapStore.installedArchives(context)) }
+    val mapArchivePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        // Any mime type is accepted at the picker: .mbtiles has none registered,
+        // so filtering there would hide the very files being looked for. The
+        // extension is checked on import instead.
+        uri?.let {
+            OfflineMapStore.import(context, it)
+            offlineMaps = OfflineMapStore.installedArchives(context)
+        }
+    }
 
     // Opening the adapter list is what actually needs the grant, so it is asked
     // for there rather than at startup — the launcher is useful without it.
@@ -855,6 +871,17 @@ fun SettingsScreen(
 
         // ── Maintenance ──────────────────────────────────────────────────────
         SettingsSection("Maintenance") {
+            SettingsButton(
+                label    = "Offline Map Archive",
+                sublabel = offlineMaps.ifEmpty { listOf("None — map falls back to cached tiles") }
+                    .joinToString(", "),
+                icon     = Icons.Default.Map,
+                accent   = accent,
+                onClick  = { mapArchivePicker.launch(arrayOf("*/*")) }
+            )
+
+            SettingsDivider()
+
             SettingsButton(
                 label    = "Head Unit Diagnostics",
                 sublabel = "Screen metrics, sensors, vendor packages",
