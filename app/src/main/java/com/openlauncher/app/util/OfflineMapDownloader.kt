@@ -99,7 +99,18 @@ class OfflineMapDownloader(private val context: Context) {
                                     (100.0 * status.completedResourceCount /
                                         status.requiredResourceCount).toInt()
                                 } else 0
-                                DownloadState.Running(
+                                // A required count of one means the style resolved
+                                // and yielded no tiles behind it. That is what a
+                                // PMTiles source does here: the archive is addressed
+                                // by byte range, so there are no per-tile URLs for
+                                // this to walk, and waiting longer changes nothing.
+                                if (status.requiredResourceCount <= 1L) {
+                                    region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                                    DownloadState.Failed(
+                                        "PMTiles source yields no tiles to enumerate — " +
+                                            "use Offline Map Archive instead"
+                                    )
+                                } else DownloadState.Running(
                                     percent.coerceIn(0, 100),
                                     megabytes,
                                     status.completedResourceCount,
