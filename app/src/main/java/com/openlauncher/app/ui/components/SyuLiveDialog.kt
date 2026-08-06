@@ -58,7 +58,7 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
         onDismissRequest = onDismiss,
         title = {
             Text(
-                "SYU LIVE — ${readings.size} ids",
+                "SYU LIVE — most recent change first",
                 fontSize = 12.sp,
                 letterSpacing = 2.sp,
                 color = accent
@@ -71,10 +71,25 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
             ) {
                 Text(status, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = accent)
 
-                readings.forEach { reading ->
-                    val age = now - (changedAt[reading.module to reading.id] ?: 0L)
-                    val recent = age < HIGHLIGHT_MS
+                // Newest change first, so operating a control puts its id at the
+                // top of the list rather than leaving it to be spotted somewhere
+                // in a fixed ordering. Ids that have never moved sink to the
+                // bottom and stay out of the way.
+                val ordered = readings.sortedByDescending { changedAt[it.module to it.id] ?: 0L }
+
+                ordered.forEach { reading ->
+                    val changed = changedAt[reading.module to reading.id] ?: 0L
+                    val age = now - changed
+                    val recent = changed > 0L && age < HIGHLIGHT_MS
                     Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            if (changed > 0L) "%4.1fs".format(age / 1000.0) else "   —",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (recent) accent
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth(0.14f)
+                        )
                         Text(
                             "m${reading.module} id${reading.id}",
                             fontSize = 10.sp,
