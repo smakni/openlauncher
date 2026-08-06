@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Launcher leaving as an app opens over it.
+
+    Finishes slightly before the incoming animation so the two overlap rather
+    than hand over, which is what stops the switch reading as two separate
+    steps. The slight scale up pushes the launcher back behind the app instead
+    of simply cutting it away.
+-->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shareInterpolator="false">
+
+    <alpha
+        android:duration="170"
+        android:fromAlpha="1.0"
+        android:interpolator="@android:interpolator/accelerate_quad"
+        android:toAlpha="0.0" />
+
+    <scale
+        android:duration="190"
+        android:fromXScale="1.0"
+        android:fromYScale="1.0"
+        android:interpolator="@android:interpolator/accelerate_quad"
+        android:pivotX="50%p"
+        android:pivotY="50%p"
+        android:toXScale="1.04"
+        android:toYScale="1.04" />
+</set>

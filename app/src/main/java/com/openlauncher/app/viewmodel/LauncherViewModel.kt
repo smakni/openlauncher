@@ -12,6 +12,7 @@ import android.os.Looper
 import android.provider.Settings as AndroidSettings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.openlauncher.app.R
 import com.openlauncher.app.data.AppSettings
 import com.openlauncher.app.data.AppTileConfig
 import com.openlauncher.app.data.DayNightMode
@@ -389,7 +390,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
             }
-        intent?.let { app.startActivity(it) }
+        // Without options the system applies its own default, which on these ROMs
+        // is usually an abrupt cut. Supplying the pair explicitly makes the
+        // launcher hand over to the app rather than disappear behind it.
+        val options = runCatching {
+            android.app.ActivityOptions
+                .makeCustomAnimation(app, R.anim.app_open_enter, R.anim.app_open_exit)
+                .toBundle()
+        }.getOrNull()
+
+        intent?.let { app.startActivity(it, options) }
     }
 
     // ── Now Playing ───────────────────────────────────────────────────────────
