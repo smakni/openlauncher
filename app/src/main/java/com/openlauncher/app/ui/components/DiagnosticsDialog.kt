@@ -215,6 +215,25 @@ private fun collectDiagnostics(context: Context): List<Pair<String, String>> = b
         )
     }
 
+    // Every com.syu / com.fyt package, unfiltered. The earlier keyword filter
+    // matched on radio, canbus, mcu and the like, which would never have matched
+    // com.syu.ms — the package that actually owns the vehicle data service, and
+    // of which com.syu.canbus is itself only a client.
+    add("syu/fyt packages" to run {
+        val vendor = installed.filter { it.startsWith("com.syu.") || it.startsWith("com.fyt.") }
+        if (vendor.isEmpty()) "none" else vendor.sorted().joinToString("\n")
+    })
+
+    // Resolving the action says whether the toolkit service exists here without
+    // binding to it, which keeps this dialog synchronous.
+    add("syu toolkit" to runCatching {
+        val services = pm.queryIntentServices(android.content.Intent("com.syu.ms.toolkit"), 0)
+        if (services.isEmpty()) "action resolves to nothing" else services.joinToString("\n") {
+            "${it.serviceInfo.packageName}/${it.serviceInfo.name.substringAfterLast('.')}" +
+                if (it.serviceInfo.exported) " exported" else " NOT exported"
+        }
+    }.getOrElse { "query failed" })
+
     // The system status bar shows an outside temperature, so something on the
     // device supplies it, but no key named for it turned up. Search by value
     // instead: anything sitting in a plausible temperature range, in degrees or
