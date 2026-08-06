@@ -955,15 +955,19 @@ fun SettingsScreen(
             SettingsDivider()
 
             SettingsButton(
-                label    = "Export Vendor APKs",
+                label    = "Dump Vendor Interfaces",
                 sublabel = vendorExport
-                    ?: "Copies the SYU packages out so their interfaces can be read",
+                    ?: "Reads the SYU AIDL signatures out as text",
                 icon     = Icons.Default.Archive,
                 accent   = accent,
                 onClick  = {
-                    val results = com.openlauncher.app.util.VendorApkExporter.exportAll(context)
-                    vendorExport = results.joinToString("  ·  ") +
-                        "  →  ${com.openlauncher.app.util.VendorApkExporter.exportDir(context)}"
+                    vendorExport = runCatching {
+                        val text = com.openlauncher.app.util.VendorInterfaceDumper.dump(context)
+                        val dir = com.openlauncher.app.util.VendorApkExporter.exportDir(context)
+                        val file = java.io.File(dir, "syu-interfaces.txt")
+                        file.writeText(text)
+                        "saved to ${file.absolutePath}"
+                    }.getOrElse { "failed: ${it.javaClass.simpleName}" }
                 }
             )
 
