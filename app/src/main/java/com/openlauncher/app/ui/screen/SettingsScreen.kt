@@ -82,6 +82,24 @@ fun SettingsScreen(
     var syuProbeRunning by remember { mutableStateOf(false) }
     var showSyuLive by remember { mutableStateOf(false) }
     var canDbResult by remember { mutableStateOf<String?>(null) }
+    var micResult by remember { mutableStateOf<String?>(null) }
+
+    fun runMicProbe() {
+        micResult = runCatching {
+            val text = com.openlauncher.app.util.MicProbe.run(context)
+            val dir = java.io.File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
+            val file = java.io.File(dir, "mic-probe.txt")
+            file.writeText(text)
+            // The muted line is the one that usually explains a silent recording,
+            // so it is surfaced here rather than left in the file.
+            val muted = text.lineSequence().firstOrNull { it.startsWith("microphone muted") }
+            "saved · ${muted.orEmpty()}"
+        }.getOrElse { "failed: ${it.javaClass.simpleName}" }
+    }
+
+    val micPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) runMicProbe() else micResult = "permission refused" }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -1020,6 +1038,22 @@ fun SettingsScreen(
                         probe.start()
                         syuProbeRunning = true
                         syuProbeStatus = "sweeping — press again in ~20s to save"
+                    }
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Probe Microphone",
+                sublabel = micResult ?: "Tests every audio source for a usable signal",
+                icon     = Icons.Default.Mic,
+                accent   = accent,
+                onClick  = {
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED
+                    ) runMicProbe() else runCatching {
+                        micPermission.launch(Manifest.permission.RECORD_AUDIO)
                     }
                 }
             )

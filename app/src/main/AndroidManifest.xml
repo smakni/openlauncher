@@ -19,6 +19,11 @@
          requires a permission. BODY_SENSORS covers heart-rate class hardware and was
          only ever a no-op prompt here, so it is deliberately not declared. -->
 
+    <!-- Microphone. The unit has its own, on a lead near the pillar; whether
+         Android can read it outside a call is a routing question the MCU
+         decides, which is what the mic probe measures. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- OBD-II adapter (ELM327 over Bluetooth SPP).
          Only CONNECT is declared: the dongle is paired once from the system
          Bluetooth settings and the launcher talks to bonded devices only, so it
