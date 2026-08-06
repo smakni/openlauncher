@@ -39,6 +39,19 @@ class SyuProbe(private val context: Context) {
     val status: StateFlow<String> = _status
 
     private val readings = linkedMapOf<Pair<Int, Int>, Reading>()
+
+    /**
+     * Every update in the order it arrived, with the time since the sweep began.
+     *
+     * Two snapshots only separate values that differ between them, which fails
+     * the moment more than one thing is changed — and changing one thing at a
+     * time, six times over, is not a reasonable thing to ask of someone sitting
+     * in a car. A timeline lets everything happen in one session: say roughly
+     * when each thing was done and the ids that moved at that moment are the
+     * answer.
+     */
+    private val timeline = mutableListOf<Pair<Long, Reading>>()
+    private var startedAtMs = 0L
     private var toolkit: IRemoteToolkit? = null
     private val callbacks = mutableListOf<Pair<IRemoteModule, IModuleCallback>>()
 
@@ -57,6 +70,8 @@ class SyuProbe(private val context: Context) {
 
     fun start() {
         readings.clear()
+        timeline.clear()
+        startedAtMs = System.currentTimeMillis()
         _status.value = "binding"
         val intent = Intent(TOOLKIT_ACTION).apply { setPackage(TOOLKIT_PACKAGE) }
         val bound = runCatching {
@@ -82,14 +97,22 @@ class SyuProbe(private val context: Context) {
                     ) {
                         // Values arrive on a binder thread; the map is only read
                         // when the report is written, after the sweep is done.
+                        val reading = Reading(
+                            module = module,
+                            id = updateId,
+                            ints = ints?.toList().orEmpty(),
+                            floats = floats?.toList().orEmpty(),
+                            strings = strings?.filterNotNull().orEmpty()
+                        )
                         synchronized(readings) {
-                            readings[module to updateId] = Reading(
-                                module = module,
-                                id = updateId,
-                                ints = ints?.toList().orEmpty(),
-                                floats = floats?.toList().orEmpty(),
-                                strings = strings?.filterNotNull().orEmpty()
-                            )
+                            val previous = readings[module to updateId]
+                            readings[module to updateId] = reading
+                            // Only changes go in the timeline. Some ids re-send an
+                            // unchanged value steadily, and logging those buries
+                            // the handful that actually respond to something.
+                            if (previous == null || previous != reading) {
+                                timeline += (System.currentTimeMillis() - startedAtMs) to reading
+                            }
                         }
                     }
                 }
