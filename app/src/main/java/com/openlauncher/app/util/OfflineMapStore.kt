@@ -20,19 +20,16 @@ import java.io.File
  */
 object OfflineMapStore {
 
-    /** Extensions osmdroid's archive provider can read. */
-    private val SUPPORTED = setOf("mbtiles", "sqlite", "zip", "gemf")
+    /** Archive formats MapLibre can read in place. */
+    private val SUPPORTED = setOf("pmtiles", "mbtiles")
 
     fun baseDir(context: Context): File {
         val external = context.getExternalFilesDir(null)
         // Falls back to internal storage only if external is genuinely absent,
         // which keeps the map working even though importing would not.
         val parent = external ?: context.filesDir
-        return File(parent, "osmdroid").apply { mkdirs() }
+        return File(parent, "maps").apply { mkdirs() }
     }
-
-    fun tileCacheDir(context: Context): File =
-        File(baseDir(context), "tiles").apply { mkdirs() }
 
     /** Archives currently installed, by file name. The tile cache is not one. */
     fun installedArchives(context: Context): List<String> =
@@ -60,6 +57,18 @@ object OfflineMapStore {
         } ?: error("cannot read file")
         name
     }
+
+    /**
+     * The archive the map should render, or null when none is installed.
+     *
+     * PMTiles wins over MBTiles when both are present: it is the vector format,
+     * so it covers far more ground per megabyte and is what the bundled style is
+     * written against.
+     */
+    fun installedPmTiles(context: Context): File? =
+        baseDir(context).listFiles()
+            ?.filter { it.isFile && it.extension.lowercase() in SUPPORTED }
+            ?.minByOrNull { if (it.extension.lowercase() == "pmtiles") 0 else 1 }
 
     fun remove(context: Context, name: String): Boolean =
         File(baseDir(context), name).takeIf { it.isFile }?.delete() ?: false

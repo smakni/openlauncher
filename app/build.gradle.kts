@@ -32,6 +32,13 @@ android {
         targetSdk      = 36
         versionCode    = 6
         versionName    = "$baseVersionName-$buildStamp"
+
+        ndk {
+            // Both ARM variants, so units older than this one still run it, but
+            // not x86: no head unit ships that architecture, and MapLibre's
+            // native libraries make each unused ABI cost real megabytes.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -104,10 +111,12 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // Map rendering. OpenStreetMap tiles, which are meant to be consumed this
-    // way — unlike the Google endpoints an earlier map widget pulled from, which
-    // is what had it reverted upstream.
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    // Map rendering. MapLibre reads PMTiles archives directly — a single file
+    // holding a whole region as vector tiles, served either from local storage
+    // or from a remote copy by HTTP range request. osmdroid, which this
+    // replaces, renders only raster tiles, and raster coverage of a region runs
+    // to tens of gigabytes where the vector equivalent is tens of megabytes.
+    implementation("org.maplibre.gl:android-sdk:11.8.0")
 
     // Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.37.3")
