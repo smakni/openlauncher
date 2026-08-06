@@ -59,6 +59,9 @@ class OfflineMapDownloader(private val context: Context) {
         }.getOrNull()
     }
 
+    /** When the current download began, for the enumeration grace period. */
+    private var startedAtMs = 0L
+
     private val _state = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val state: StateFlow<DownloadState> = _state
 
@@ -68,6 +71,7 @@ class OfflineMapDownloader(private val context: Context) {
             _state.value = DownloadState.Failed("map engine unavailable")
             return
         }
+        startedAtMs = System.currentTimeMillis()
         _state.value = DownloadState.Running(0, 0, 0, 0)
 
         val definition = OfflineTilePyramidRegionDefinition(
@@ -99,12 +103,17 @@ class OfflineMapDownloader(private val context: Context) {
                                     (100.0 * status.completedResourceCount /
                                         status.requiredResourceCount).toInt()
                                 } else 0
-                                // A required count of one means the style resolved
-                                // and yielded no tiles behind it. That is what a
-                                // PMTiles source does here: the archive is addressed
-                                // by byte range, so there are no per-tile URLs for
-                                // this to walk, and waiting longer changes nothing.
-                                if (status.requiredResourceCount <= 1L) {
+                                // Only after a grace period. The required count
+                                // starts at one — the style — and only grows once
+                                // that has been fetched and parsed, so judging it
+                                // on the first status report aborts every download
+                                // before it can begin. That is what the earlier
+                                // "no tiles to enumerate" reading actually was:
+                                // this check firing on its own first callback.
+                                val elapsed = System.currentTimeMillis() - startedAtMs
+                                if (status.requiredResourceCount <= 1L &&
+                                    elapsed > ENUMERATION_GRACE_MS
+                                ) {
                                     region.setDownloadState(OfflineRegion.STATE_INACTIVE)
                                     // Deliberately not naming a cause: this fires
                                     // for any style that yields no tiles, and
@@ -184,5 +193,8 @@ class OfflineMapDownloader(private val context: Context) {
         const val MIN_ZOOM = 8.0
         const val MAX_ZOOM = 15.0
         const val KM_PER_DEGREE_LAT = 111.32
+
+        /** Long enough for the style to be fetched and its tiles counted. */
+        const val ENUMERATION_GRACE_MS = 20_000L
     }
 }
