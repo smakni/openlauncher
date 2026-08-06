@@ -6,10 +6,14 @@ import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -17,7 +21,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -41,6 +48,28 @@ fun DiagnosticsDialog(accent: Color, onDismiss: () -> Unit) {
     val configuration = LocalConfiguration.current
     val rows = remember { collectDiagnostics(context) }
 
+    // Compose reports these two, and they are the numbers the widget grid is
+    // actually laid out against — worth keeping next to the raw metrics in case
+    // the two disagree.
+    val allRows = remember(rows) {
+        listOf("compose dp" to "${configuration.screenWidthDp} x ${configuration.screenHeightDp}") + rows
+    }
+    var exportResult by remember { mutableStateOf<String?>(null) }
+
+    // CreateDocument rather than a fixed path: it needs no storage permission and
+    // lets the destination be picked, including a USB stick — which on a head
+    // unit is usually the only practical way to get a file off the device.
+    val exporter = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri ->
+        exportResult = if (uri == null) null else runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(asPlainText(allRows).toByteArray())
+            } ?: error("no stream")
+            "saved"
+        }.getOrElse { "save failed" }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("HEAD UNIT DIAGNOSTICS", fontSize = 12.sp, letterSpacing = 2.sp, color = accent) },
@@ -49,17 +78,48 @@ fun DiagnosticsDialog(accent: Color, onDismiss: () -> Unit) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                // Compose reports these two, and they are the numbers the widget
-                // grid is actually laid out against — worth showing next to the
-                // raw metrics in case the two disagree.
-                DiagRow("compose dp", "${configuration.screenWidthDp} x ${configuration.screenHeightDp}", accent)
-                rows.forEach { (label, value) -> DiagRow(label, value, accent) }
+                exportResult?.let {
+                    Text(it, color = accent, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                    Spacer(Modifier.height(4.dp))
+                }
+                allRows.forEach { (label, value) -> DiagRow(label, value, accent) }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) { Text("CLOSE", color = accent, fontSize = 11.sp) }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                    clipboard?.setPrimaryClip(
+                        android.content.ClipData.newPlainText("diagnostics", asPlainText(allRows))
+                    )
+                    exportResult = "copied to clipboard"
+                }) { Text("COPY", color = accent, fontSize = 11.sp) }
+
+                TextButton(onClick = {
+                    exporter.launch("headunit-diagnostics.txt")
+                }) { Text("EXPORT", color = accent, fontSize = 11.sp) }
+            }
         }
     )
+}
+
+/**
+ * Flattens the rows into a text file.
+ *
+ * Multi-line values are indented under their label rather than run together, so
+ * a package list or a settings dump stays readable once out of the dialog.
+ */
+private fun asPlainText(rows: List<Pair<String, String>>): String = buildString {
+    append("Open Launcher — head unit diagnostics\n")
+    append("=".repeat(44)).append('\n')
+    for ((label, value) in rows) {
+        val lines = value.split('\n')
+        append(label.padEnd(18)).append(lines.first()).append('\n')
+        for (extra in lines.drop(1)) append(" ".repeat(18)).append(extra).append('\n')
+    }
 }
 
 @Composable
