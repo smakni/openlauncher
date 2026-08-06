@@ -76,6 +76,10 @@ fun SettingsScreen(
     var vendorExport by remember { mutableStateOf<String?>(null) }
     var syuProbe by remember { mutableStateOf<com.openlauncher.app.util.SyuProbe?>(null) }
     var syuProbeStatus by remember { mutableStateOf<String?>(null) }
+    // Explicit, rather than inferred from the status text: the previous version
+    // tested whether that text contained a word, and the first press overwrote it
+    // with a message that did not, so the save branch was unreachable.
+    var syuProbeRunning by remember { mutableStateOf(false) }
     val mapArchivePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -965,10 +969,13 @@ fun SettingsScreen(
                 onClick  = {
                     val probe = syuProbe ?: com.openlauncher.app.util.SyuProbe(context)
                         .also { syuProbe = it }
-                    if (syuProbe != null && syuProbeStatus?.contains("ids") == true) {
-                        syuProbeStatus = probe.writeReport()
+                    if (syuProbeRunning) {
+                        syuProbeStatus = probe.writeReport() + "  ·  " + probe.status.value
+                        probe.stop()
+                        syuProbeRunning = false
                     } else {
                         probe.start()
+                        syuProbeRunning = true
                         syuProbeStatus = "sweeping — press again in ~20s to save"
                     }
                 }
