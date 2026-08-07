@@ -4,6 +4,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -39,6 +45,12 @@ private const val CAMERA_EASE_MS = 1000
 
 /** Half-width of the screen box searched for roads, in pixels. */
 private const val SNAP_QUERY_PX = 120f
+
+/** Zoom bounds and step feel, kept away from the extremes the data cannot fill. */
+private const val MIN_ZOOM = 4.0
+private const val MAX_ZOOM = 18.0
+private const val ZOOM_STEP = 1.0
+private const val ZOOM_EASE_MS = 250
 
 /**
  * Keeps the map alive between visits to the home screen.
@@ -143,6 +155,14 @@ fun MapWidget(
     // position on a map that was not there.
     var styleReady by remember { mutableStateOf(false) }
 
+    // Whether the camera still follows the vehicle. Panning or zooming turns it
+    // off — otherwise the next fix, a second later, would drag the map straight
+    // back and make the gesture look broken.
+    var following by remember { mutableStateOf(true) }
+    // Held so the overlay controls can drive the camera; getMapAsync only
+    // delivers it inside the view's own callback.
+    var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
+
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = {
@@ -154,16 +174,30 @@ fun MapWidget(
             modifier = Modifier.fillMaxSize(),
             update = { view ->
                 view.getMapAsync { map ->
+                    mapRef = map
                     if (map.style == null) {
                         map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
                         map.uiSettings.apply {
                             isAttributionEnabled = false
                             isLogoEnabled = false
                             isCompassEnabled = false
-                            setAllGesturesEnabled(false)
+                            // Rotation stays off: the map is turned to the
+                            // heading, so letting it be rotated by hand fights
+                            // that on the next fix.
+                            isScrollGesturesEnabled = true
+                            isZoomGesturesEnabled = true
+                            isRotateGesturesEnabled = false
+                            isTiltGesturesEnabled = false
+                        }
+                        // Reason 1 is a gesture; animations driven from here
+                        // report their own reason and must not stop the follow.
+                        map.addOnCameraMoveStartedListener { reason ->
+                            if (reason == org.maplibre.android.maps.MapLibreMap
+                                    .OnCameraMoveStartedListener.REASON_API_GESTURE
+                            ) following = false
                         }
                     }
-                    location?.let {
+                    location?.takeIf { following }?.let {
                         val raw = LatLng(it.latitude, it.longitude)
                         // Queried against what is already on screen, so this costs
                         // no network and no extra geometry — the roads under the
@@ -180,9 +214,12 @@ fun MapWidget(
                             RoadSnapper.snap(raw, roads, roadSnapMetres.toDouble()) ?: raw
                         } else raw
 
+                        // Keeps whatever zoom is in effect, so following again
+                        // after a pinch does not snap back to the default.
+                        val zoom = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
                         val camera = CameraPosition.Builder()
                             .target(target)
-                            .zoom(DEFAULT_ZOOM)
+                            .zoom(zoom)
                             // The map turns and the vehicle stays pointing up the
                             // screen, which is what makes a moving map readable at
                             // a glance.
@@ -203,6 +240,23 @@ fun MapWidget(
         // Drawn over the map rather than added as a layer: the camera is centred
         // on the vehicle and turned to its heading, so the centre of the widget
         // is the vehicle by construction, and an arrow there is always right.
+        MapControls(
+            accent = accent,
+            following = following,
+            onZoom = { delta ->
+                mapRef?.let { map ->
+                    map.easeCamera(
+                        CameraUpdateFactory.zoomTo(
+                            (map.cameraPosition.zoom + delta).coerceIn(MIN_ZOOM, MAX_ZOOM)
+                        ),
+                        ZOOM_EASE_MS
+                    )
+                }
+            },
+            onRecentre = { following = true },
+            modifier = Modifier.align(Alignment.CenterEnd)
+        )
+
         if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
             val arrow = Path().apply {
                 moveTo(size.width / 2f, 0f)
@@ -214,5 +268,46 @@ fun MapWidget(
             drawPath(arrow, accent)
             drawPath(arrow, Color.Black, style = Stroke(width = 2f))
         }
+    }
+}
+
+/**
+ * Zoom and recentre, laid over the map.
+ *
+ * On-screen buttons rather than pinch alone: a pinch needs two fingers and a
+ * moment of attention, which is not something to ask for at the wheel. Recentre
+ * only appears once following has stopped, so it does not take room while it
+ * would do nothing.
+ */
+@Composable
+private fun MapControls(
+    accent: Color,
+    following: Boolean,
+    onZoom: (Double) -> Unit,
+    onRecentre: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(end = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        MapButton("+", accent) { onZoom(ZOOM_STEP) }
+        MapButton("−", accent) { onZoom(-ZOOM_STEP) }
+        if (!following) MapButton("◉", accent, onClick = onRecentre)
+    }
+}
+
+@Composable
+private fun MapButton(label: String, accent: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(Color.Black.copy(alpha = 0.45f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, color = accent, fontSize = 15.sp)
     }
 }
