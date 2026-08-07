@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
+import com.openlauncher.app.util.RoadSnapper
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -35,6 +36,9 @@ private const val DEFAULT_ZOOM = 15.0
 
 /** Matches the roughly one second between GPS fixes, so easing is continuous. */
 private const val CAMERA_EASE_MS = 1000
+
+/** Half-width of the screen box searched for roads, in pixels. */
+private const val SNAP_QUERY_PX = 120f
 
 /**
  * Keeps the map alive between visits to the home screen.
@@ -78,6 +82,7 @@ fun MapWidget(
     bearing: Float,
     styleUri: String,
     hasMapData: Boolean,
+    roadSnapMetres: Int = 0,
     accent: Color,
     isDayMode: Boolean = false,
     isEditing: Boolean = false,
@@ -159,8 +164,24 @@ fun MapWidget(
                         }
                     }
                     location?.let {
+                        val raw = LatLng(it.latitude, it.longitude)
+                        // Queried against what is already on screen, so this costs
+                        // no network and no extra geometry — the roads under the
+                        // marker have necessarily been drawn already.
+                        val target = if (roadSnapMetres > 0 && styleReady) {
+                            val centre = view.width / 2f to view.height / 2f
+                            val box = android.graphics.RectF(
+                                centre.first - SNAP_QUERY_PX, centre.second - SNAP_QUERY_PX,
+                                centre.first + SNAP_QUERY_PX, centre.second + SNAP_QUERY_PX
+                            )
+                            val roads = runCatching {
+                                map.queryRenderedFeatures(box, *RoadSnapper.ROAD_LAYERS)
+                            }.getOrDefault(emptyList())
+                            RoadSnapper.snap(raw, roads, roadSnapMetres.toDouble()) ?: raw
+                        } else raw
+
                         val camera = CameraPosition.Builder()
-                            .target(LatLng(it.latitude, it.longitude))
+                            .target(target)
                             .zoom(DEFAULT_ZOOM)
                             // The map turns and the vehicle stays pointing up the
                             // screen, which is what makes a moving map readable at

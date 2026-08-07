@@ -509,6 +509,7 @@ fun HomeScreen(
                             bearing    = bearing,
                             styleUri   = mapStyleUri,
                             hasMapData = hasMapData,
+                            roadSnapMetres = settings.roadSnapMetres,
                             accent    = accent,
                             isDayMode = isDayMode,
                             isEditing = editMode,

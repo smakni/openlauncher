@@ -982,6 +982,33 @@ fun SettingsScreen(
 
             SettingsDivider()
 
+            SettingsRow(
+                label    = "Snap To Roads",
+                sublabel = if (settings.roadSnapMetres == 0)
+                    "Off — the marker shows the raw fix"
+                else "Within ${settings.roadSnapMetres} m; further out the raw fix is kept",
+                icon     = Icons.Default.Timeline
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(0, 15, 25, 40).forEach { m ->
+                        FilterChip(
+                            selected = settings.roadSnapMetres == m,
+                            onClick  = { onUpdate { copy(roadSnapMetres = m) } },
+                            label    = {
+                                Text(if (m == 0) "Off" else "$m m",
+                                     fontSize = 9.sp, letterSpacing = 0.5.sp)
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
             SettingsButton(
                 label    = "Download Map Around Me",
                 sublabel = when (val d = mapDownload) {

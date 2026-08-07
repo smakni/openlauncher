@@ -69,6 +69,7 @@ class SettingsRepository(private val context: Context) {
         val PMTILES_URL           = stringPreferencesKey("pmtiles_url")
         val MAP_RADIUS_KM         = intPreferencesKey("map_radius_km")
         val TILE_URL_TEMPLATE     = stringPreferencesKey("tile_url_template")
+        val ROAD_SNAP_METRES      = intPreferencesKey("road_snap_metres")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
         val SHOW_APP_SHORTCUT_1   = booleanPreferencesKey("show_app_shortcut_1")
         val SHOW_APP_SHORTCUT_2   = booleanPreferencesKey("show_app_shortcut_2")
@@ -161,6 +162,7 @@ class SettingsRepository(private val context: Context) {
                 pmtilesUrl       = prefs[Keys.PMTILES_URL] ?: defaults.pmtilesUrl,
                 offlineMapRadiusKm = prefs[Keys.MAP_RADIUS_KM] ?: defaults.offlineMapRadiusKm,
                 tileUrlTemplate  = prefs[Keys.TILE_URL_TEMPLATE] ?: defaults.tileUrlTemplate,
+                roadSnapMetres   = prefs[Keys.ROAD_SNAP_METRES] ?: defaults.roadSnapMetres,
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
                 showAppShortcut1 = prefs[Keys.SHOW_APP_SHORTCUT_1] ?: defaults.showAppShortcut1,
                 showAppShortcut2 = prefs[Keys.SHOW_APP_SHORTCUT_2] ?: defaults.showAppShortcut2,
@@ -234,6 +236,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.PMTILES_URL]         = s.pmtilesUrl
             prefs[Keys.MAP_RADIUS_KM]       = s.offlineMapRadiusKm
             prefs[Keys.TILE_URL_TEMPLATE]   = s.tileUrlTemplate
+            prefs[Keys.ROAD_SNAP_METRES]    = s.roadSnapMetres
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
             prefs[Keys.SHOW_APP_SHORTCUT_1] = s.showAppShortcut1
             prefs[Keys.SHOW_APP_SHORTCUT_2] = s.showAppShortcut2

@@ -146,6 +146,10 @@ data class AppSettings(
     // region download possible at all: the downloader enumerates per-tile URLs,
     // which an archive addressed by byte range does not have.
     val tileUrlTemplate: String = "",
+    // Metres within which the vehicle marker is pulled onto a road. Zero turns
+    // it off; beyond it the raw fix is kept, so crossing a car park does not
+    // put the marker confidently on a street it is not on.
+    val roadSnapMetres: Int = 20,
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,
