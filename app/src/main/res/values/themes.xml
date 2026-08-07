@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        The launch animation was supplied per call through ActivityOptions, which
+        only ever covers going out. Coming back is a different transition and
+        takes its animations from the window style, so it kept the platform
+        default and slid.
+    -->
+    <style name="LauncherTheme" parent="@android:style/Theme.Black.NoTitleBar.Fullscreen">
+        <item name="android:windowAnimationStyle">@style/LauncherWindowAnimation</item>
+    </style>
+
+    <style name="LauncherWindowAnimation" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/app_open_enter</item>
+        <item name="android:activityOpenExitAnimation">@anim/app_open_exit</item>
+        <item name="android:activityCloseEnterAnimation">@anim/home_return_enter</item>
+        <item name="android:activityCloseExitAnimation">@anim/home_return_exit</item>
+
+        <!-- Launching another app crosses tasks rather than staying within one. -->
+        <item name="android:taskOpenEnterAnimation">@anim/app_open_enter</item>
+        <item name="android:taskOpenExitAnimation">@anim/app_open_exit</item>
+        <item name="android:taskCloseEnterAnimation">@anim/home_return_enter</item>
+        <item name="android:taskCloseExitAnimation">@anim/home_return_exit</item>
+
+        <!-- Pressing home from an open app is this pair specifically. -->
+        <item name="android:taskToBackEnterAnimation">@anim/home_return_enter</item>
+        <item name="android:taskToBackExitAnimation">@anim/home_return_exit</item>
+        <item name="android:taskToFrontEnterAnimation">@anim/app_open_enter</item>
+        <item name="android:taskToFrontExitAnimation">@anim/app_open_exit</item>
+    </style>
+</resources>

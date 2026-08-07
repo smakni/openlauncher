@@ -61,7 +61,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:hardwareAccelerated="true"
-        android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+        android:theme="@style/LauncherTheme"
         android:exported="true">
 
         <!-- Single launcher activity -->
