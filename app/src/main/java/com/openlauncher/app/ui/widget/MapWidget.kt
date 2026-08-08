@@ -17,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -44,8 +45,15 @@ import org.maplibre.android.maps.Style
 
 private const val DEFAULT_ZOOM = 15.0
 
-/** Matches the roughly one second between GPS fixes, so easing is continuous. */
-private const val CAMERA_EASE_MS = 1000
+/**
+ * Slightly longer than the second between GPS fixes.
+ *
+ * Matched exactly, each ease finishes just before the next begins and the map
+ * comes to rest for an instant every second — a stutter that reads as lag.
+ * Overrunning means the next fix interrupts a still-moving camera, which is
+ * what makes the motion continuous.
+ */
+private const val CAMERA_EASE_MS = 1150
 
 /** Half-width of the screen box searched for roads, in pixels. */
 private const val SNAP_QUERY_PX = 120f
@@ -164,6 +172,70 @@ fun MapWidget(
     // delivers it inside the view's own callback.
     var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
 
+    // Driven by the inputs rather than by recomposition. The AndroidView update
+    // block runs on every recomposition, and the home screen recomposes
+    // constantly — engine data, clock, speed. Each pass restarted a one-second
+    // ease from wherever the camera had got to, so the previous one was
+    // cancelled after covering a few percent of its path and the camera jittered
+    // in place instead of travelling. The road query paid the same price, several
+    // times a second instead of once a fix.
+    LaunchedEffect(mapRef, location, bearing, tiltDegrees, autoZoomSeconds, following, styleReady) {
+        val map = mapRef ?: return@LaunchedEffect
+        if (!following) return@LaunchedEffect
+        val fix = location ?: return@LaunchedEffect
+
+        val raw = LatLng(fix.latitude, fix.longitude)
+        // Queried against what is already on screen, so this costs no network and
+        // no extra geometry — the roads under the marker have necessarily been
+        // drawn already.
+        val target = if (roadSnapMetres > 0 && styleReady) {
+            val cx = mapView.width / 2f
+            val cy = mapView.height / 2f
+            val box = android.graphics.RectF(
+                cx - SNAP_QUERY_PX, cy - SNAP_QUERY_PX,
+                cx + SNAP_QUERY_PX, cy + SNAP_QUERY_PX
+            )
+            val roads = runCatching {
+                map.queryRenderedFeatures(box, *RoadSnapper.ROAD_LAYERS)
+            }.getOrDefault(emptyList())
+            RoadSnapper.snap(raw, roads, roadSnapMetres.toDouble()) ?: raw
+        } else raw
+
+        // Keeps whatever zoom is in effect, so following again after a pinch does
+        // not snap back to the default.
+        val held = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
+        // Returning null means leave the camera alone, which covers standstill
+        // and drifts inside the deadband.
+        val zoom = AutoZoom.target(
+            speedMps = fix.speedMps,
+            horizonSeconds = autoZoomSeconds,
+            currentZoom = held,
+            currentMetresPerPixel = runCatching {
+                map.projection.getMetersPerPixelAtLatitude(fix.latitude)
+            }.getOrDefault(0.0),
+            viewportHeightPx = mapView.height
+        ) ?: held
+
+        val camera = CameraPosition.Builder()
+            .target(target)
+            .zoom(zoom)
+            // The map turns and the vehicle stays pointing up the screen, which
+            // is what makes a moving map readable at a glance.
+            .bearing(bearing.toDouble())
+            // Pitch trades some of the width of the road ahead for distance,
+            // which is what makes a moving map read as depth rather than as a
+            // diagram.
+            .tilt(tiltDegrees.toDouble())
+            .build()
+        // Eased across the interval between fixes rather than set outright.
+        // Assigning the position jumped the map once a second; this makes the
+        // same data read as movement.
+        runCatching {
+            map.easeCamera(CameraUpdateFactory.newCameraPosition(camera), CAMERA_EASE_MS)
+        }
+    }
+
+
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = {
@@ -204,59 +276,6 @@ fun MapWidget(
                                     .OnCameraMoveStartedListener.REASON_API_GESTURE
                             ) following = false
                         }
-                    }
-                    location?.takeIf { following }?.let {
-                        val raw = LatLng(it.latitude, it.longitude)
-                        // Queried against what is already on screen, so this costs
-                        // no network and no extra geometry — the roads under the
-                        // marker have necessarily been drawn already.
-                        val target = if (roadSnapMetres > 0 && styleReady) {
-                            val centre = view.width / 2f to view.height / 2f
-                            val box = android.graphics.RectF(
-                                centre.first - SNAP_QUERY_PX, centre.second - SNAP_QUERY_PX,
-                                centre.first + SNAP_QUERY_PX, centre.second + SNAP_QUERY_PX
-                            )
-                            val roads = runCatching {
-                                map.queryRenderedFeatures(box, *RoadSnapper.ROAD_LAYERS)
-                            }.getOrDefault(emptyList())
-                            RoadSnapper.snap(raw, roads, roadSnapMetres.toDouble()) ?: raw
-                        } else raw
-
-                        // Keeps whatever zoom is in effect, so following again
-                        // after a pinch does not snap back to the default.
-                        val held = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
-                        // Only while following: applied after a pan it would
-                        // undo the gesture that stopped the follow in the first
-                        // place. Returning null means leave the camera alone,
-                        // which covers standstill and drifts inside the deadband.
-                        val zoom = AutoZoom.target(
-                            speedMps = it.speedMps,
-                            horizonSeconds = autoZoomSeconds,
-                            currentZoom = held,
-                            currentMetresPerPixel = runCatching {
-                                map.projection.getMetersPerPixelAtLatitude(it.latitude)
-                            }.getOrDefault(0.0),
-                            viewportHeightPx = view.height
-                        ) ?: held
-                        val camera = CameraPosition.Builder()
-                            .target(target)
-                            .zoom(zoom)
-                            // The map turns and the vehicle stays pointing up the
-                            // screen, which is what makes a moving map readable at
-                            // a glance.
-                            .bearing(bearing.toDouble())
-                            // Pitch trades some of the width of the road ahead
-                            // for distance, which is what makes a moving map
-                            // read as depth rather than as a diagram.
-                            .tilt(tiltDegrees.toDouble())
-                            .build()
-                        // Eased across the interval between fixes rather than set
-                        // outright. Assigning the position jumped the map once a
-                        // second; this makes the same data read as movement.
-                        map.easeCamera(
-                            CameraUpdateFactory.newCameraPosition(camera),
-                            CAMERA_EASE_MS
-                        )
                     }
                 }
             }
