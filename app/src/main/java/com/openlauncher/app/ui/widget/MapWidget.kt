@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
+import com.openlauncher.app.util.AutoZoom
 import com.openlauncher.app.util.RoadSnapper
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
@@ -94,6 +95,7 @@ fun MapWidget(
     hasMapData: Boolean,
     roadSnapMetres: Int = 0,
     tiltDegrees: Int = 0,
+    autoZoomSeconds: Int = 0,
     accent: Color,
     isDayMode: Boolean = false,
     isEditing: Boolean = false,
@@ -222,7 +224,20 @@ fun MapWidget(
 
                         // Keeps whatever zoom is in effect, so following again
                         // after a pinch does not snap back to the default.
-                        val zoom = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
+                        val held = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
+                        // Only while following: applied after a pan it would
+                        // undo the gesture that stopped the follow in the first
+                        // place. Returning null means leave the camera alone,
+                        // which covers standstill and drifts inside the deadband.
+                        val zoom = AutoZoom.target(
+                            speedMps = it.speedMps,
+                            horizonSeconds = autoZoomSeconds,
+                            currentZoom = held,
+                            currentMetresPerPixel = runCatching {
+                                map.projection.getMetersPerPixelAtLatitude(it.latitude)
+                            }.getOrDefault(0.0),
+                            viewportHeightPx = view.height
+                        ) ?: held
                         val camera = CameraPosition.Builder()
                             .target(target)
                             .zoom(zoom)

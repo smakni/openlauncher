@@ -159,6 +159,11 @@ data class AppSettings(
     // Points of interest — shops, stations, parks. Off by default: at speed
     // they are clutter, and the road labels are what actually help.
     val mapShowPlaces: Boolean = false,
+    // Seconds of road kept visible ahead. Zero disables the automatic zoom and
+    // leaves whatever level was last set. A time rather than a distance: what
+    // is worth seeing ahead is a reaction interval, so the zoom follows from
+    // the speed instead of being decided against it.
+    val mapAutoZoomSeconds: Int = 0,
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,

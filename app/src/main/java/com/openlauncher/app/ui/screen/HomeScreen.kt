@@ -511,6 +511,7 @@ fun HomeScreen(
                             hasMapData = hasMapData,
                             roadSnapMetres = settings.roadSnapMetres,
                             tiltDegrees = settings.mapTiltDegrees,
+                            autoZoomSeconds = settings.mapAutoZoomSeconds,
                             accent    = accent,
                             isDayMode = isDayMode,
                             isEditing = editMode,

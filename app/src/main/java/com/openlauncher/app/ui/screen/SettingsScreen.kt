@@ -1062,6 +1062,35 @@ fun SettingsScreen(
             SettingsDivider()
 
             SettingsRow(
+                label    = "Auto Zoom",
+                sublabel = if (settings.mapAutoZoomSeconds == 0) "Off — zoom stays where you leave it"
+                           else "Keeps ${settings.mapAutoZoomSeconds}s of road ahead in view",
+                icon     = Icons.Default.ZoomInMap
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(0, 20, 30, 45).forEach { seconds ->
+                        FilterChip(
+                            selected = settings.mapAutoZoomSeconds == seconds,
+                            onClick  = { onUpdate { copy(mapAutoZoomSeconds = seconds) } },
+                            label    = {
+                                Text(
+                                    if (seconds == 0) "OFF" else "${seconds}s",
+                                    fontSize = 9.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsRow(
                 label    = "Show Places",
                 sublabel = "Shops, stations and parks — clutter at speed",
                 icon     = Icons.Default.Place
