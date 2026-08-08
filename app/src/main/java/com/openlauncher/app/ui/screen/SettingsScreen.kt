@@ -1030,6 +1030,51 @@ fun SettingsScreen(
 
             SettingsDivider()
 
+            SettingsRow(
+                label    = "Map Perspective",
+                sublabel = if (settings.mapTiltDegrees == 0) "Flat — straight down"
+                           else "${settings.mapTiltDegrees}° — buildings raised",
+                icon     = Icons.Default.Landscape
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Beyond about sixty degrees the horizon enters the frame and
+                    // most of the tile is sky, so the range stops short of it.
+                    listOf(0, 30, 45, 60).forEach { degrees ->
+                        FilterChip(
+                            selected = settings.mapTiltDegrees == degrees,
+                            onClick  = { onUpdate { copy(mapTiltDegrees = degrees) } },
+                            label    = {
+                                Text(
+                                    if (degrees == 0) "FLAT" else "$degrees°",
+                                    fontSize = 9.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsRow(
+                label    = "Show Places",
+                sublabel = "Shops, stations and parks — clutter at speed",
+                icon     = Icons.Default.Place
+            ) {
+                Switch(
+                    checked = settings.mapShowPlaces,
+                    onCheckedChange = { onUpdate { copy(mapShowPlaces = it) } },
+                    colors = switchColors(accent)
+                )
+            }
+
+            SettingsDivider()
+
             SettingsButton(
                 label    = "Download Map Around Me",
                 sublabel = when (val d = mapDownload) {

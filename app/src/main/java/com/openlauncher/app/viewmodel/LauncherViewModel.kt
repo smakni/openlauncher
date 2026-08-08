@@ -63,7 +63,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
      */
     fun mapStyleUri(): String = runCatching {
         com.openlauncher.app.util.OfflineMapStore.resolvedStyleUri(
-            getApplication(), settings.value.pmtilesUrl, settings.value.tileUrlTemplate
+            getApplication(),
+            settings.value.pmtilesUrl,
+            settings.value.tileUrlTemplate,
+            tilted = settings.value.mapTiltDegrees > 0,
+            showPlaces = settings.value.mapShowPlaces
         )
     }.getOrDefault("")
 

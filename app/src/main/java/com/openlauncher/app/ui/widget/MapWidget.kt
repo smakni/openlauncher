@@ -93,6 +93,7 @@ fun MapWidget(
     styleUri: String,
     hasMapData: Boolean,
     roadSnapMetres: Int = 0,
+    tiltDegrees: Int = 0,
     accent: Color,
     isDayMode: Boolean = false,
     isEditing: Boolean = false,
@@ -229,6 +230,10 @@ fun MapWidget(
                             // screen, which is what makes a moving map readable at
                             // a glance.
                             .bearing(bearing.toDouble())
+                            // Pitch trades some of the width of the road ahead
+                            // for distance, which is what makes a moving map
+                            // read as depth rather than as a diagram.
+                            .tilt(tiltDegrees.toDouble())
                             .build()
                         // Eased across the interval between fixes rather than set
                         // outright. Assigning the position jumped the map once a

@@ -70,6 +70,8 @@ class SettingsRepository(private val context: Context) {
         val MAP_RADIUS_KM         = intPreferencesKey("map_radius_km")
         val TILE_URL_TEMPLATE     = stringPreferencesKey("tile_url_template")
         val ROAD_SNAP_METRES      = intPreferencesKey("road_snap_metres")
+        val MAP_TILT_DEGREES      = intPreferencesKey("map_tilt_degrees")
+        val MAP_SHOW_PLACES       = booleanPreferencesKey("map_show_places")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
         val SHOW_APP_SHORTCUT_1   = booleanPreferencesKey("show_app_shortcut_1")
         val SHOW_APP_SHORTCUT_2   = booleanPreferencesKey("show_app_shortcut_2")
@@ -163,6 +165,8 @@ class SettingsRepository(private val context: Context) {
                 offlineMapRadiusKm = prefs[Keys.MAP_RADIUS_KM] ?: defaults.offlineMapRadiusKm,
                 tileUrlTemplate  = prefs[Keys.TILE_URL_TEMPLATE] ?: defaults.tileUrlTemplate,
                 roadSnapMetres   = prefs[Keys.ROAD_SNAP_METRES] ?: defaults.roadSnapMetres,
+                mapTiltDegrees   = prefs[Keys.MAP_TILT_DEGREES] ?: defaults.mapTiltDegrees,
+                mapShowPlaces    = prefs[Keys.MAP_SHOW_PLACES] ?: defaults.mapShowPlaces,
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
                 showAppShortcut1 = prefs[Keys.SHOW_APP_SHORTCUT_1] ?: defaults.showAppShortcut1,
                 showAppShortcut2 = prefs[Keys.SHOW_APP_SHORTCUT_2] ?: defaults.showAppShortcut2,
@@ -237,6 +241,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.MAP_RADIUS_KM]       = s.offlineMapRadiusKm
             prefs[Keys.TILE_URL_TEMPLATE]   = s.tileUrlTemplate
             prefs[Keys.ROAD_SNAP_METRES]    = s.roadSnapMetres
+            prefs[Keys.MAP_TILT_DEGREES]    = s.mapTiltDegrees
+            prefs[Keys.MAP_SHOW_PLACES]     = s.mapShowPlaces
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
             prefs[Keys.SHOW_APP_SHORTCUT_1] = s.showAppShortcut1
             prefs[Keys.SHOW_APP_SHORTCUT_2] = s.showAppShortcut2

@@ -3,6 +3,8 @@ package com.openlauncher.app.util
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -99,7 +101,9 @@ object OfflineMapStore {
     fun resolvedStyleUri(
         context: Context,
         remotePmTilesUrl: String,
-        tileUrlTemplate: String = ""
+        tileUrlTemplate: String = "",
+        tilted: Boolean = false,
+        showPlaces: Boolean = false
     ): String {
         val archive = installedPmTiles(context)
         // A tile template wins over everything: it is the only source the region
@@ -113,9 +117,88 @@ object OfflineMapStore {
         }
         val styleFile = File(baseDir(context), "style.json")
         val json = context.assets.open("map-style.json").bufferedReader().use { it.readText() }
-        styleFile.writeText(json.replace("\"url\": \"__PMTILES_URL__\"", sourceJson))
+            .replace("\"url\": \"__PMTILES_URL__\"", sourceJson)
+
+        // Layer surgery is done on the parsed document rather than by patching
+        // text: the flat and raised building layers are not interchangeable
+        // strings, and a style that fails to parse renders as nothing at all.
+        val patched = runCatching { withLayers(json, tilted, showPlaces) }.getOrDefault(json)
+        styleFile.writeText(patched)
         return "file://${styleFile.absolutePath}"
     }
+
+    /**
+     * Raises the buildings and adds points of interest, as asked for.
+     *
+     * Buildings are only extruded when the camera is tilted. Seen from directly
+     * above, an extrusion is indistinguishable from the flat shape it replaces,
+     * so drawing one would cost frames and change nothing — and frames are not
+     * abundant on this hardware.
+     */
+    private fun withLayers(json: String, tilted: Boolean, showPlaces: Boolean): String {
+        val root = JSONObject(json)
+        val layers = root.getJSONArray("layers")
+        val rebuilt = JSONArray()
+
+        for (i in 0 until layers.length()) {
+            val layer = layers.getJSONObject(i)
+            if (tilted && layer.optString("id") == "buildings") {
+                rebuilt.put(JSONObject(BUILDINGS_3D))
+            } else {
+                rebuilt.put(layer)
+            }
+        }
+
+        if (showPlaces) {
+            // Appended last so the labels sit above everything, and the dots
+            // above the roads they mark rather than under them.
+            rebuilt.put(JSONObject(POI_DOTS))
+            rebuilt.put(JSONObject(POI_LABELS))
+        }
+
+        root.put("layers", rebuilt)
+        return root.toString()
+    }
+
+    /**
+     * Heights come from the data where it has them and fall back to a storey or
+     * two — a building drawn at zero height is a hole in the skyline, which
+     * reads worse than a wrong but plausible guess.
+     */
+    private const val BUILDINGS_3D = """
+        {"id": "buildings", "type": "fill-extrusion", "source": "protomaps",
+         "source-layer": "buildings", "minzoom": 14,
+         "paint": {
+           "fill-extrusion-color": "#2b323d",
+           "fill-extrusion-height": ["coalesce", ["get", "height"], 8],
+           "fill-extrusion-base": ["coalesce", ["get", "min_height"], 0],
+           "fill-extrusion-opacity": 0.92
+         }}
+    """
+
+    private const val POI_DOTS = """
+        {"id": "poi-dots", "type": "circle", "source": "protomaps",
+         "source-layer": "pois", "minzoom": 15,
+         "paint": {"circle-radius": 2.5, "circle-color": "#7c8899"}}
+    """
+
+    private const val POI_LABELS = """
+        {"id": "poi-labels", "type": "symbol", "source": "protomaps",
+         "source-layer": "pois", "minzoom": 15,
+         "layout": {
+           "text-field": ["get", "name"],
+           "text-font": ["Noto Sans Regular"],
+           "text-size": 10,
+           "text-anchor": "top",
+           "text-offset": [0, 0.6],
+           "text-max-width": 8
+         },
+         "paint": {
+           "text-color": "#a8b2c0",
+           "text-halo-color": "#12151a",
+           "text-halo-width": 1.2
+         }}
+    """
 
     fun remove(context: Context, name: String): Boolean =
         File(baseDir(context), name).takeIf { it.isFile }?.delete() ?: false

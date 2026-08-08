@@ -510,6 +510,7 @@ fun HomeScreen(
                             styleUri   = mapStyleUri,
                             hasMapData = hasMapData,
                             roadSnapMetres = settings.roadSnapMetres,
+                            tiltDegrees = settings.mapTiltDegrees,
                             accent    = accent,
                             isDayMode = isDayMode,
                             isEditing = editMode,
