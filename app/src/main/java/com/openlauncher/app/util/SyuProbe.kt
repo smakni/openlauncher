@@ -65,6 +65,24 @@ class SyuProbe(private val context: Context) {
      * answer.
      */
     private val timeline = mutableListOf<Pair<Long, Reading>>()
+
+    /**
+     * Isolates one action instead of asking anyone to read a moving list.
+     *
+     * Watching values scroll works at a desk and not in a car: dozens of ids
+     * re-send constantly, the interesting one is on screen for a moment, and it
+     * has to be spotted while operating the control that caused it. Arming a
+     * capture, performing the action, then stopping turns that into a question
+     * with an answer — whatever changed inside the window, and nothing else.
+     */
+    private var captureFromMs: Long? = null
+
+    private val _capturing = MutableStateFlow(false)
+    val capturing: StateFlow<Boolean> = _capturing
+
+    /** What moved during the last capture, newest first. Empty until one ends. */
+    private val _captured = MutableStateFlow<List<Reading>>(emptyList())
+    val captured: StateFlow<List<Reading>> = _captured
     private var startedAtMs = 0L
     private var toolkit: IRemoteToolkit? = null
     private val callbacks = mutableListOf<Pair<IRemoteModule, IModuleCallback>>()
@@ -148,6 +166,32 @@ class SyuProbe(private val context: Context) {
     }
 
     /** Writes what has arrived so far, and returns where it landed. */
+    fun beginCapture() {
+        _captured.value = emptyList()
+        captureFromMs = System.currentTimeMillis() - startedAtMs
+        _capturing.value = true
+    }
+
+    /**
+     * Ends the window and reports what changed inside it.
+     *
+     * Ids are de-duplicated to their final value: a dial swept through a range
+     * emits a long run of updates, and the useful line is the id, not each step
+     * it passed through on the way.
+     */
+    fun endCapture() {
+        val from = captureFromMs ?: return
+        _capturing.value = false
+        captureFromMs = null
+        val moved = synchronized(readings) {
+            timeline.filter { (at, _) -> at >= from }
+        }
+        _captured.value = moved
+            .reversed()
+            .distinctBy { (_, r) -> r.module to r.id }
+            .map { (_, r) -> r }
+    }
+
     fun writeReport(): String = runCatching {
         val dir = File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
         val file = File(dir, "syu-probe.txt")

@@ -44,6 +44,7 @@ import com.openlauncher.app.ui.theme.contrastOn
 import com.openlauncher.app.util.OfflineMapStore
 import com.openlauncher.app.util.SunriseSunset
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import com.openlauncher.app.ui.components.ColorPickerDialog
 import com.openlauncher.app.ui.components.ConfirmDialog
@@ -83,18 +84,32 @@ fun SettingsScreen(
     var showSyuLive by remember { mutableStateOf(false) }
     var canDbResult by remember { mutableStateOf<String?>(null) }
     var micResult by remember { mutableStateOf<String?>(null) }
+    var tileTestResult by remember { mutableStateOf<String?>(null) }
+
+    val probeScope = rememberCoroutineScope()
 
     fun runMicProbe() {
-        micResult = runCatching {
-            val text = com.openlauncher.app.util.MicProbe.run(context)
-            val dir = java.io.File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
-            val file = java.io.File(dir, "mic-probe.txt")
-            file.writeText(text)
-            // The muted line is the one that usually explains a silent recording,
-            // so it is surfaced here rather than left in the file.
-            val muted = text.lineSequence().firstOrNull { it.startsWith("microphone muted") }
-            "saved · ${muted.orEmpty()}"
-        }.getOrElse { "failed: ${it.javaClass.simpleName}" }
+        // Off the main thread. Opening the audio input blocks for as long as the
+        // driver takes, once per source, so running it inline froze the launcher
+        // for seconds and was reported as a crash — which, for a home screen that
+        // stops drawing, it may as well have been.
+        micResult = "probing…"
+        probeScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val result = runCatching {
+                val dir = java.io.File(context.getExternalFilesDir(null), "vendor")
+                    .apply { mkdirs() }
+                val file = java.io.File(dir, "mic-probe.txt")
+                // The file is the sink, written line by line, so a probe that
+                // dies partway still leaves everything up to the source that
+                // killed it — the one fact worth having.
+                val text = com.openlauncher.app.util.MicProbe.run(context, file)
+                // The muted line usually explains a silent recording on its own,
+                // so it is surfaced here rather than left in the file.
+                val muted = text.lineSequence().firstOrNull { it.startsWith("microphone muted") }
+                "saved · ${muted.orEmpty()}"
+            }.getOrElse { "failed: ${it.javaClass.simpleName} — partial file saved" }
+            withContext(kotlinx.coroutines.Dispatchers.Main) { micResult = result }
+        }
     }
 
     val micPermission = rememberLauncherForActivityResult(
@@ -921,26 +936,15 @@ fun SettingsScreen(
         }
 
         // ── Maintenance ──────────────────────────────────────────────────────
-        SettingsSection("Maintenance") {
-            SettingsRow(
-                label    = "Offline Map Radius",
-                sublabel = "Area downloaded around the current position",
-                icon     = Icons.Default.Straighten
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(10, 25, 50).forEach { km ->
-                        FilterChip(
-                            selected = settings.offlineMapRadiusKm == km,
-                            onClick  = { onUpdate { copy(offlineMapRadiusKm = km) } },
-                            label    = { Text("$km km", fontSize = 9.sp, letterSpacing = 0.5.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = accent,
-                                selectedLabelColor     = contrastOn(accent)
-                            )
-                        )
-                    }
-                }
-            }
+        SettingsSection("Maps") {
+            SettingsButton(
+                label    = "Offline Map Archive",
+                sublabel = offlineMaps.ifEmpty { listOf("None — map falls back to cached tiles") }
+                    .joinToString(", "),
+                icon     = Icons.Default.Map,
+                accent   = accent,
+                onClick  = { runCatching { mapArchivePicker.launch(arrayOf("*/*")) } }
+            )
 
             SettingsDivider()
 
@@ -980,24 +984,41 @@ fun SettingsScreen(
                 }
             }
 
+            // Fetches a single tile and reports the status code. The region
+            // downloader can only say a style yielded nothing, which covers a
+            // wrong URL, a rejected key, and no connection at all — three
+            // problems behind one message, and guessing between them is what
+            // this replaces.
+            SettingsButton(
+                label    = "Test Tile URL",
+                sublabel = tileTestResult ?: "One request — says whether the URL answers",
+                icon     = Icons.Default.NetworkCheck,
+                accent   = accent,
+                onClick  = {
+                    tileTestResult = "testing…"
+                    probeScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val result =
+                            com.openlauncher.app.util.TileUrlTester.test(settings.tileUrlTemplate)
+                        withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            tileTestResult = result
+                        }
+                    }
+                }
+            )
+
             SettingsDivider()
 
             SettingsRow(
-                label    = "Snap To Roads",
-                sublabel = if (settings.roadSnapMetres == 0)
-                    "Off — the marker shows the raw fix"
-                else "Within ${settings.roadSnapMetres} m; further out the raw fix is kept",
-                icon     = Icons.Default.Timeline
+                label    = "Offline Map Radius",
+                sublabel = "Area downloaded around the current position",
+                icon     = Icons.Default.Straighten
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(0, 15, 25, 40).forEach { m ->
+                    listOf(10, 25, 50).forEach { km ->
                         FilterChip(
-                            selected = settings.roadSnapMetres == m,
-                            onClick  = { onUpdate { copy(roadSnapMetres = m) } },
-                            label    = {
-                                Text(if (m == 0) "Off" else "$m m",
-                                     fontSize = 9.sp, letterSpacing = 0.5.sp)
-                            },
+                            selected = settings.offlineMapRadiusKm == km,
+                            onClick  = { onUpdate { copy(offlineMapRadiusKm = km) } },
+                            label    = { Text("$km km", fontSize = 9.sp, letterSpacing = 0.5.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = accent,
                                 selectedLabelColor     = contrastOn(accent)
@@ -1038,13 +1059,63 @@ fun SettingsScreen(
 
             SettingsDivider()
 
+            SettingsRow(
+                label    = "Snap To Roads",
+                sublabel = if (settings.roadSnapMetres == 0)
+                    "Off — the marker shows the raw fix"
+                else "Within ${settings.roadSnapMetres} m; further out the raw fix is kept",
+                icon     = Icons.Default.Timeline
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf(0, 15, 25, 40).forEach { m ->
+                        FilterChip(
+                            selected = settings.roadSnapMetres == m,
+                            onClick  = { onUpdate { copy(roadSnapMetres = m) } },
+                            label    = {
+                                Text(if (m == 0) "Off" else "$m m",
+                                     fontSize = 9.sp, letterSpacing = 0.5.sp)
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick  = { showResetDialog = true },
+                shape    = RoundedCornerShape(4.dp),
+                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A0000)),
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Icon(Icons.Default.RestartAlt, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Reset to Defaults", color = MaterialTheme.colorScheme.error, fontSize = 13.sp, letterSpacing = 1.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+        
+        }
+
+        SettingsSection("Diagnostics") {
             SettingsButton(
-                label    = "Offline Map Archive",
-                sublabel = offlineMaps.ifEmpty { listOf("None — map falls back to cached tiles") }
-                    .joinToString(", "),
-                icon     = Icons.Default.Map,
+                label    = "Live Vehicle Values",
+                sublabel = "Watch which id moves as you turn a knob",
+                icon     = Icons.Default.Timeline,
                 accent   = accent,
-                onClick  = { runCatching { mapArchivePicker.launch(arrayOf("*/*")) } }
+                onClick  = {
+                    val probe = syuProbe ?: com.openlauncher.app.util.SyuProbe(context)
+                        .also { syuProbe = it }
+                    if (!syuProbeRunning) {
+                        probe.start()
+                        syuProbeRunning = true
+                    }
+                    showSyuLive = true
+                }
             )
 
             SettingsDivider()
@@ -1107,24 +1178,6 @@ fun SettingsScreen(
             SettingsDivider()
 
             SettingsButton(
-                label    = "Live Vehicle Values",
-                sublabel = "Watch which id moves as you turn a knob",
-                icon     = Icons.Default.Timeline,
-                accent   = accent,
-                onClick  = {
-                    val probe = syuProbe ?: com.openlauncher.app.util.SyuProbe(context)
-                        .also { syuProbe = it }
-                    if (!syuProbeRunning) {
-                        probe.start()
-                        syuProbeRunning = true
-                    }
-                    showSyuLive = true
-                }
-            )
-
-            SettingsDivider()
-
-            SettingsButton(
                 label    = "Dump Vendor Interfaces",
                 sublabel = vendorExport
                     ?: "Reads the SYU AIDL signatures out as text",
@@ -1150,21 +1203,6 @@ fun SettingsScreen(
                 accent   = accent,
                 onClick  = { showDiagnostics = true }
             )
-
-            SettingsDivider()
-
-            Spacer(Modifier.height(8.dp))
-            Button(
-                onClick  = { showResetDialog = true },
-                shape    = RoundedCornerShape(4.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A0000)),
-                modifier = Modifier.fillMaxWidth().height(44.dp)
-            ) {
-                Icon(Icons.Default.RestartAlt, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Reset to Defaults", color = MaterialTheme.colorScheme.error, fontSize = 13.sp, letterSpacing = 1.sp)
-            }
-            Spacer(Modifier.height(8.dp))
         }
 
         Spacer(Modifier.height(32.dp))

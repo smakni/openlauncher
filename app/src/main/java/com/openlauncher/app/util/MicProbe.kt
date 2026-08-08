@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import java.io.File
 import kotlin.math.sqrt
 
 /**
@@ -30,34 +31,70 @@ object MicProbe {
         "CAMCORDER" to MediaRecorder.AudioSource.CAMCORDER
     )
 
-    private val SAMPLE_RATES = listOf(48000, 44100, 16000, 8000)
+    /**
+     * One rate rather than four.
+     *
+     * Twenty consecutive opens of the audio HAL is what took the launcher down:
+     * a head unit's driver is not built for that, and a failed open can leave
+     * the input in a state the next one trips over. 16 kHz is the rate voice
+     * input is universally wired for, so it costs nothing to drop the rest.
+     */
+    private const val SAMPLE_RATE = 16000
 
-    fun run(context: Context): String = buildString {
-        append("Microphone probe\n")
-        append("=".repeat(52)).append('\n')
+    /** Lets the HAL release the input before the next source claims it. */
+    private const val SETTLE_MS = 250L
 
-        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-        // Checked first because it explains a silent recording on its own, and it
-        // is the one cause that can be undone from here rather than worked around.
-        append("\nmicrophone muted : ${audio?.isMicrophoneMute}\n")
-        append("mode             : ${audio?.mode}\n")
-        append("wired headset    : ${runCatching {
+    private const val READS = 12
+
+    /**
+     * Runs the probe, writing the report as it is produced.
+     *
+     * Written progressively rather than returned whole because the previous
+     * version crashed partway and left nothing at all — losing the single fact
+     * worth having, which is *which source* killed it. Now the file ends at
+     * whatever was being attempted, and that names the culprit.
+     */
+    fun run(context: Context, sink: File): String {
+        val out = StringBuilder()
+        fun emit(line: String) {
+            out.append(line)
+            runCatching { sink.writeText(out.toString()) }
+        }
+
+        emit("Microphone probe\n")
+        emit("=".repeat(52) + "\n")
+
+        val audio = runCatching {
+            context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        }.getOrNull()
+        // Reported first because it explains a silent recording on its own, and
+        // is the one cause that can be undone rather than worked around.
+        emit("\nmicrophone muted : ${runCatching { audio?.isMicrophoneMute }.getOrNull()}\n")
+        emit("mode             : ${runCatching { audio?.mode }.getOrNull()}\n")
+        emit("wired headset    : ${runCatching {
             @Suppress("DEPRECATION") audio?.isWiredHeadsetOn
         }.getOrNull()}\n")
-        append("bluetooth sco    : ${runCatching {
+        emit("bluetooth sco    : ${runCatching {
             @Suppress("DEPRECATION") audio?.isBluetoothScoOn
         }.getOrNull()}\n")
 
-        append("\nsource                rate    state       level\n")
+        emit("\nsource                rate    state       level\n")
         for ((name, source) in SOURCES) {
-            for (rate in SAMPLE_RATES) {
-                append("%-20s %6d  ".format(name, rate))
-                append(measure(source, rate)).append('\n')
+            emit("%-20s %6d  ".format(name, SAMPLE_RATE))
+            // Throwable rather than Exception: a bad audio HAL surfaces as an
+            // Error, and that is precisely the case worth surviving here.
+            val result = try {
+                measure(source, SAMPLE_RATE)
+            } catch (t: Throwable) {
+                "FAILED ${t.javaClass.simpleName}"
             }
+            emit("$result\n")
+            runCatching { Thread.sleep(SETTLE_MS) }
         }
 
-        append("\nA source that opens with a level of zero is routed but silent — ")
-        append("usually the MCU holding the microphone muted outside a call.\n")
+        emit("\nA source that opens with a level of zero is routed but silent — ")
+        emit("usually the MCU holding the microphone muted outside a call.\n")
+        return out.toString()
     }
 
     /**
@@ -101,18 +138,14 @@ object MicProbe {
                     loudest = maxOf(loudest, sqrt(sum / read))
                 }
             }
-            record.stop()
+            runCatching { record.stop() }
 
             val level = (loudest / Short.MAX_VALUE * 100).toInt()
             if (level == 0) "opened      silent" else "opened      $level%"
         } catch (e: SecurityException) {
             "no permission"
-        } catch (e: Exception) {
-            e.javaClass.simpleName
         } finally {
             runCatching { record?.release() }
         }
     }
-
-    private const val READS = 12
 }
