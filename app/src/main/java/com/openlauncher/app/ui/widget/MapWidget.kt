@@ -46,11 +46,6 @@ private const val CAMERA_EASE_MS = 1000
 /** Half-width of the screen box searched for roads, in pixels. */
 private const val SNAP_QUERY_PX = 120f
 
-/** Zoom bounds and step feel, kept away from the extremes the data cannot fill. */
-private const val MIN_ZOOM = 4.0
-private const val MAX_ZOOM = 18.0
-private const val ZOOM_STEP = 1.0
-private const val ZOOM_EASE_MS = 250
 
 /**
  * Keeps the map alive between visits to the home screen.
@@ -240,22 +235,16 @@ fun MapWidget(
         // Drawn over the map rather than added as a layer: the camera is centred
         // on the vehicle and turned to its heading, so the centre of the widget
         // is the vehicle by construction, and an arrow there is always right.
-        MapControls(
-            accent = accent,
-            following = following,
-            onZoom = { delta ->
-                mapRef?.let { map ->
-                    map.easeCamera(
-                        CameraUpdateFactory.zoomTo(
-                            (map.cameraPosition.zoom + delta).coerceIn(MIN_ZOOM, MAX_ZOOM)
-                        ),
-                        ZOOM_EASE_MS
-                    )
-                }
-            },
-            onRecentre = { following = true },
-            modifier = Modifier.align(Alignment.CenterEnd)
-        )
+        // Only the recentre control. Zoom keeps its pinch gesture, and buttons
+        // for it took room on a tile that is already small.
+        if (!following) {
+            MapButton(
+                label = "◉",
+                accent = accent,
+                onClick = { following = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
+            )
+        }
 
         if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
             val arrow = Path().apply {
@@ -271,37 +260,15 @@ fun MapWidget(
     }
 }
 
-/**
- * Zoom and recentre, laid over the map.
- *
- * On-screen buttons rather than pinch alone: a pinch needs two fingers and a
- * moment of attention, which is not something to ask for at the wheel. Recentre
- * only appears once following has stopped, so it does not take room while it
- * would do nothing.
- */
 @Composable
-private fun MapControls(
+private fun MapButton(
+    label: String,
     accent: Color,
-    following: Boolean,
-    onZoom: (Double) -> Unit,
-    onRecentre: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.padding(end = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        MapButton("+", accent) { onZoom(ZOOM_STEP) }
-        MapButton("−", accent) { onZoom(-ZOOM_STEP) }
-        if (!following) MapButton("◉", accent, onClick = onRecentre)
-    }
-}
-
-@Composable
-private fun MapButton(label: String, accent: Color, onClick: () -> Unit) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(30.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(Color.Black.copy(alpha = 0.45f))
