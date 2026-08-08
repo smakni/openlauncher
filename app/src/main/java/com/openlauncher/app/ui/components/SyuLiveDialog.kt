@@ -30,6 +30,24 @@ import kotlinx.coroutines.delay
 private const val HIGHLIGHT_MS = 3000L
 
 /**
+ * Protocol numbers the vendor CAN database lists for Land Rover, by id_value.
+ *
+ * The MCU holds the selected protocol as a plain number, and these are the only
+ * two the database offers for this brand. Naming them here turns one line of the
+ * sweep into an answer: whichever id carries one of these values is reporting
+ * what the unit is actually configured as, which the factory menu would
+ * otherwise have to be opened to read.
+ *
+ * The distinction matters beyond curiosity — only the second routes the car's
+ * own reversing camera, so a unit set to the first shows a black screen with
+ * nothing wrong in the wiring.
+ */
+private val KNOWN_PROTOCOLS = mapOf(
+    411 to "LAND ROVER — base",
+    65947 to "LAND ROVER — high, original reversing camera"
+)
+
+/**
  * Live view of the vendor service's values.
  *
  * Identifying an id from exported files needs one action per run and a round
@@ -81,6 +99,7 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
                     val changed = changedAt[reading.module to reading.id] ?: 0L
                     val age = now - changed
                     val recent = changed > 0L && age < HIGHLIGHT_MS
+                    val protocol = reading.ints.firstNotNullOfOrNull { KNOWN_PROTOCOLS[it] }
                     Row(modifier = Modifier.fillMaxWidth()) {
                         Text(
                             if (changed > 0L) "%4.1fs".format(age / 1000.0) else "   —",
@@ -115,6 +134,16 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
                             fontSize = 10.sp,
                             fontFamily = FontFamily.Monospace,
                             color = if (recent) accent else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    // Called out on its own line rather than squeezed into the
+                    // value column, which is already dense and monospaced.
+                    if (protocol != null) {
+                        Text(
+                            "      └ $protocol",
+                            fontSize = 9.sp,
+                            fontFamily = FontFamily.Monospace,
+                            color = accent
                         )
                     }
                 }
