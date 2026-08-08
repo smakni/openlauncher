@@ -23,6 +23,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -170,6 +173,13 @@ fun MapWidget(
             update = { view ->
                 view.getMapAsync { map ->
                     mapRef = map
+                    // The retained MapView keeps its style across navigation, so
+                    // the branch below runs once for the life of the process while
+                    // styleReady is remembered per composition. Returning to the
+                    // home screen therefore left the flag false over a map that
+                    // was perfectly loaded — and the marker simply vanished.
+                    if (map.style != null) styleReady = true
+
                     if (map.style == null) {
                         map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
                         map.uiSettings.apply {
@@ -246,16 +256,41 @@ fun MapWidget(
             )
         }
 
-        if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
+        if (styleReady && location != null) Canvas(modifier = Modifier.size(30.dp)) {
+            val w = size.width
+            val h = size.height
+
+            // A grounding shadow. Without it the marker reads as pasted onto the
+            // map rather than standing on it, and over pale streets it loses its
+            // edge entirely.
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.22f),
+                radius = w * 0.46f,
+                center = Offset(w / 2f, h * 0.62f)
+            )
+
             val arrow = Path().apply {
-                moveTo(size.width / 2f, 0f)
-                lineTo(size.width * 0.18f, size.height)
-                lineTo(size.width / 2f, size.height * 0.72f)
-                lineTo(size.width * 0.82f, size.height)
+                moveTo(w * 0.5f, h * 0.04f)
+                lineTo(w * 0.88f, h * 0.90f)
+                lineTo(w * 0.5f, h * 0.68f)
+                lineTo(w * 0.12f, h * 0.90f)
                 close()
             }
+
+            // Outlined first with a thick round-joined stroke, then filled over
+            // the top. That rounds the corners without any curve arithmetic, and
+            // the border is what keeps the arrow legible over a road of the same
+            // colour — the accent alone disappears against its own palette.
+            drawPath(
+                arrow,
+                if (isDayMode) Color.White else Color.Black,
+                style = Stroke(
+                    width = 6f,
+                    join = StrokeJoin.Round,
+                    cap = StrokeCap.Round
+                )
+            )
             drawPath(arrow, accent)
-            drawPath(arrow, Color.Black, style = Stroke(width = 2f))
         }
     }
 }
