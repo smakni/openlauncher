@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalGasStation
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +36,11 @@ import androidx.compose.ui.unit.sp
  * litres are what the car actually said and are shown as the reading; the bar is
  * a convenience drawn on top of an assumption, which is why the number is the
  * larger of the two.
+ *
+ * This car sends no level at all — the ZHTD decoder declares the field and the
+ * Evoque never fills it — so in practice the widget falls through to its lamp:
+ * unlit normally, amber when the car raises its own reserve warning. The reading
+ * path stays because an OBD dongle would supply one.
  */
 @Composable
 fun FuelWidget(
@@ -94,34 +103,27 @@ fun FuelWidget(
                 Text("FROM OBD", color = labelColor, fontSize = 9.sp, letterSpacing = 1.5.sp)
             }
 
-            // The car raises a low-fuel lamp and reports no level. That is the
-            // whole of what it says about fuel, so it is what gets shown —
-            // a real warning beats an invented number.
-            lowFuelWarning == true -> {
-                Text(
-                    "LOW",
-                    color = Color(0xFFD59A3C),
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Light
-                )
-                Text("car's own warning", color = labelColor, fontSize = 9.sp)
-            }
-
+            // No level, so the widget becomes the thing a car already uses for
+            // this: a lamp. Dark almost always, lit when the car says reserve.
+            // A lamp needs no words — an unlit one is not an error message, it
+            // is the normal state, and explaining that in text every day to
+            // report nothing would be worse than saying nothing.
             else -> {
-                Text("—", color = labelColor, fontSize = 30.sp)
-                Text(
-                    when {
-                        !canConnected -> "CAN not connected"
-                        // Established rather than assumed: the ZHTD decoder
-                        // declares one fuel field and this car writes zero to
-                        // it, always. Saying so is more use than a dash that
-                        // looks like something still loading.
-                        lowFuelWarning != null -> "level not sent by this car"
-                        else -> "no fuel level"
-                    },
-                    color = labelColor,
-                    fontSize = 9.sp
+                val lit = lowFuelWarning == true
+                Icon(
+                    imageVector = Icons.Default.LocalGasStation,
+                    contentDescription = if (lit) "Low fuel" else null,
+                    tint = if (lit) Color(0xFFD59A3C) else labelColor.copy(alpha = 0.28f),
+                    modifier = Modifier.size(46.dp)
                 )
+                if (lit) {
+                    Text(
+                        "RESERVE",
+                        color = Color(0xFFD59A3C),
+                        fontSize = 10.sp,
+                        letterSpacing = 2.sp
+                    )
+                }
             }
         }
 
