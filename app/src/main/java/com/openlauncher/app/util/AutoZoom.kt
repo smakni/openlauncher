@@ -35,9 +35,13 @@ object AutoZoom {
      */
     private const val DEADBAND = 0.25
 
-    /** Past 17 there is nothing left to reveal; below 13 streets stop naming. */
+    /**
+     * Below 13 streets stop being named. The ceiling matches the default so
+     * that standing still and then moving off does not pull the camera back
+     * from where it was left.
+     */
     private const val MIN_ZOOM = 13.0
-    private const val MAX_ZOOM = 17.0
+    private const val MAX_ZOOM = 20.0
 
     /**
      * The zoom that puts [horizonSeconds] of road in the top half of the view,

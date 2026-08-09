@@ -44,13 +44,16 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
 /**
- * Close enough to read street names on the first frame.
+ * Building scale.
  *
- * Fifteen shows a district, which is the right scale for finding yourself on a
- * map and the wrong one for driving on it — the level a moving map wants is the
- * one where the next turning is legible.
+ * The tiles stop at zoom 15, so everything past it is overzoom — the same
+ * geometry drawn larger. Vector data survives that where a raster tile would
+ * blur, since the shapes are rendered rather than magnified, but no new detail
+ * appears above 15 and labels thin out as they are spaced for a smaller scale.
+ * Twenty is close, and close is what was asked for; it is worth knowing that the
+ * gain over 18 is size rather than information.
  */
-private const val DEFAULT_ZOOM = 17.0
+private const val DEFAULT_ZOOM = 20.0
 
 /** Long enough for a re-attached GL surface to be live before it is queried. */
 private const val SURFACE_SETTLE_MS = 700L
