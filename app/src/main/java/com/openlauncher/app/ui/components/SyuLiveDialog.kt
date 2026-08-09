@@ -31,25 +31,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openlauncher.app.util.SyuProbe
+import com.openlauncher.app.util.VendorIds
 import kotlinx.coroutines.delay
-
-/**
- * Protocol numbers seen so far, by id_value.
- *
- * Both belong to HiWorld, and this unit's decoder is ZHTD — so neither is the
- * one it runs. They are kept because naming a value that does appear costs
- * nothing, and labelled by maker so they cannot be mistaken for it again: the
- * database was dumped four hundred rows deep out of five thousand, every Land
- * Rover entry inside that window happened to be HiWorld, and the conclusion
- * drawn was about the brand rather than about the window.
- *
- * The ZHTD equivalents are what matter and are not known yet. The unlimited
- * Land Rover dump exists to find them.
- */
-private val KNOWN_PROTOCOLS = mapOf(
-    411 to "HIWORLD Land Rover — base (not this unit's maker)",
-    65947 to "HIWORLD Land Rover — high, original reversing (not this unit's maker)"
-)
 
 /**
  * Identifies a vendor id by isolating one action.
@@ -116,6 +99,37 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
 
                 Text(status, fontSize = 9.sp, fontFamily = FontFamily.Monospace, color = accent)
 
+                // The known signals, whether or not anything moved. A capture
+                // answers "which id was that"; this answers "is the decoder
+                // sending it at all", and an id that never appears is as much an
+                // answer as one that does.
+                val live by probe.live.collectAsState()
+                val known = live.filter { VendorIds.label(it.module, it.id) != null }
+                if (known.isNotEmpty()) {
+                    Text(
+                        "NAMED SIGNALS",
+                        fontSize = 9.sp,
+                        letterSpacing = 1.5.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                    known.forEach { reading ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                VendorIds.label(reading.module, reading.id).orEmpty(),
+                                fontSize = 11.sp,
+                                color = accent,
+                                modifier = Modifier.fillMaxWidth(0.5f)
+                            )
+                            Text(
+                                reading.ints.joinToString(","),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
                 if (!capturing && captured.isEmpty()) {
                     Text(
                         "No capture yet.",
@@ -153,9 +167,13 @@ fun SyuLiveDialog(probe: SyuProbe, accent: Color, onDismiss: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                    reading.ints.firstNotNullOfOrNull { KNOWN_PROTOCOLS[it] }?.let { protocol ->
+                    // Named from the vendor's own class rather than guessed at.
+                    // A capture used to end with a number and the meaning left to
+                    // be worked out; now the meaning is printed and only
+                    // confirmation is owed.
+                    VendorIds.label(reading.module, reading.id)?.let { name ->
                         Text(
-                            "      └ $protocol",
+                            "      └ $name",
                             fontSize = 9.sp,
                             fontFamily = FontFamily.Monospace,
                             color = accent
