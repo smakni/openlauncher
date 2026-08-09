@@ -398,15 +398,6 @@ fun MapWidget(
             val w = size.width
             val h = size.height
 
-            // A grounding shadow. Without it the marker reads as pasted onto the
-            // map rather than standing on it, and over pale streets it loses its
-            // edge entirely.
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.22f),
-                radius = w * 0.46f,
-                center = Offset(w / 2f, h * 0.62f)
-            )
-
             val arrow = Path().apply {
                 moveTo(w * 0.5f, h * 0.04f)
                 lineTo(w * 0.88f, h * 0.90f)
@@ -419,6 +410,10 @@ fun MapWidget(
             // the top. That rounds the corners without any curve arithmetic, and
             // the border is what keeps the arrow legible over a road of the same
             // colour — the accent alone disappears against its own palette.
+            //
+            // The outline does the whole job. There was a shadow disc under this
+            // as well and it only muddied the map: a dark blob under a small
+            // marker reads as dirt on the screen rather than as depth.
             drawPath(
                 arrow,
                 if (isDayMode) Color.White else Color.Black,
