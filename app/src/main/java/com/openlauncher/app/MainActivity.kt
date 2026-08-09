@@ -219,9 +219,6 @@ class MainActivity : ComponentActivity() {
                             ) { destination ->
                                 when (destination) {
                                     NavDestination.HOME -> HomeScreen(
-                                        installedIconFor    = { pkg -> apps.find { it.packageName == pkg }?.icon },
-                                        onLaunchApp         = { pkg -> vm.launchApp(pkg) },
-                                        onAssignAppTile     = { index -> vm.startAppTilePicker(index) },
                                         mapStyleUri         = mapStyleUri,
                                         hasMapData          = hasMapData,
                                         vehicle             = vehicle,
@@ -279,7 +276,6 @@ class MainActivity : ComponentActivity() {
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.ANDROID_AUTO -> "CHOOSE ANDROID AUTO APP"
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.PIP          -> "CHOOSE PIP APP"
                                             com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.RADIO        -> "CHOOSE RADIO APP"
-                                            com.openlauncher.app.viewmodel.LauncherViewModel.AppPickerTarget.APP_TILE     -> "CHOOSE APP FOR SHORTCUT"
                                             else -> "CHOOSE CARPLAY APP"
                                         },
                                         accent              = accent,

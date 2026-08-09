@@ -75,9 +75,7 @@ class SettingsRepository(private val context: Context) {
         val OFFLINE_MAP_MAX_ZOOM  = intPreferencesKey("offline_map_max_zoom")
         val MAP_SHOW_PLACES       = booleanPreferencesKey("map_show_places")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
-        val SHOW_APP_SHORTCUT_1   = booleanPreferencesKey("show_app_shortcut_1")
-        val SHOW_APP_SHORTCUT_2   = booleanPreferencesKey("show_app_shortcut_2")
-        val APP_TILES_JSON        = stringPreferencesKey("app_tiles_json")
+        val SHOW_TEMPERATURE      = booleanPreferencesKey("show_temperature")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -173,13 +171,7 @@ class SettingsRepository(private val context: Context) {
                     ?: defaults.offlineMapMaxZoom,
                 mapShowPlaces    = prefs[Keys.MAP_SHOW_PLACES] ?: defaults.mapShowPlaces,
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
-                showAppShortcut1 = prefs[Keys.SHOW_APP_SHORTCUT_1] ?: defaults.showAppShortcut1,
-                showAppShortcut2 = prefs[Keys.SHOW_APP_SHORTCUT_2] ?: defaults.showAppShortcut2,
-                appShortcutTiles = prefs[Keys.APP_TILES_JSON]?.let {
-                    runCatching {
-                        gson.fromJson<List<AppTileConfig>>(it, object : TypeToken<List<AppTileConfig>>() {}.type)
-                    }.getOrNull()
-                } ?: defaults.appShortcutTiles
+                showTemperature  = prefs[Keys.SHOW_TEMPERATURE] ?: defaults.showTemperature
             )
     }
 
@@ -251,9 +243,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.OFFLINE_MAP_MAX_ZOOM] = s.offlineMapMaxZoom
             prefs[Keys.MAP_SHOW_PLACES]     = s.mapShowPlaces
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
-            prefs[Keys.SHOW_APP_SHORTCUT_1] = s.showAppShortcut1
-            prefs[Keys.SHOW_APP_SHORTCUT_2] = s.showAppShortcut2
-            prefs[Keys.APP_TILES_JSON]     = gson.toJson(s.appShortcutTiles)
+            prefs[Keys.SHOW_TEMPERATURE]    = s.showTemperature
     }
 
     suspend fun resetToDefaults() {

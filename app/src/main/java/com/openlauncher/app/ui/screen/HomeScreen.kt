@@ -67,9 +67,8 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads"),
     WidgetTypeInfo("VEHICLE",     "VEHICLE",     Icons.Default.DirectionsCar, "Live engine data (OBD-II)"),
-    WidgetTypeInfo("MAP",         "MAP",         Icons.Default.Map,           "Position on an OpenStreetMap view"),
-    WidgetTypeInfo("APP_SHORTCUT_1", "APP 1",    Icons.Default.Apps,          "Shortcut to an app"),
-    WidgetTypeInfo("APP_SHORTCUT_2", "APP 2",    Icons.Default.Apps,          "Shortcut to an app")
+    WidgetTypeInfo("TEMPERATURE", "OUTSIDE",     Icons.Default.Thermostat,    "Outside temperature, from CAN"),
+    WidgetTypeInfo("MAP",         "MAP",         Icons.Default.Map,           "Position on an OpenStreetMap view")
 )
 
 private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boolean {
@@ -84,9 +83,8 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
+        if (settings.showTemperature) add("TEMPERATURE")
         if (settings.showMap) add("MAP")
-        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
-        if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
     val activeWidgets = settings.widgetLayout.filter { it.enabled && it.id in visibleIds }
     val occupied = buildSet<Pair<Int, Int>> {
@@ -142,11 +140,8 @@ fun HomeScreen(
     onRadioSwitchAm: () -> Unit = {},
     onRadioTune: (band: String, freq: Float) -> Unit = { _, _ -> },
     onAssignRadio: () -> Unit = {},
-    installedIconFor: (String) -> android.graphics.drawable.Drawable? = { null },
     mapStyleUri: String = "",
     hasMapData: Boolean = false,
-    onLaunchApp: (String) -> Unit = {},
-    onAssignAppTile: (Int) -> Unit = {},
     vehicle: com.openlauncher.app.model.VehicleState = com.openlauncher.app.model.VehicleState(),
     obdStatus: com.openlauncher.app.model.ObdStatus = com.openlauncher.app.model.ObdStatus.DISABLED,
     modifier: Modifier = Modifier
@@ -264,9 +259,8 @@ fun HomeScreen(
                 if (settings.showTripTracker) add("TRIP_TRACKER")
                 if (settings.showSoundboard) add("SOUNDBOARD")
                 if (settings.showVehicle) add("VEHICLE")
-        if (settings.showMap) add("MAP")
-        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
-                if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
+                if (settings.showTemperature) add("TEMPERATURE")
+                if (settings.showMap) add("MAP")
             }
 
             // Keep only visible widgets exactly as configured in settings, allowing explicit resizing to dictate layout
@@ -344,10 +338,9 @@ fun HomeScreen(
                     "SOUNDBOARD"  -> "SOUND"
                     "MAP"         -> "MAP"
                     "VEHICLE"     -> "VEHICLE"
-                    "APP_SHORTCUT_1" -> settings.appShortcutTiles.getOrNull(0)
-                        ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 1"
-                    "APP_SHORTCUT_2" -> settings.appShortcutTiles.getOrNull(1)
-                        ?.label?.takeIf { it.isNotEmpty() }?.uppercase() ?: "APP 2"
+                    // The widget draws its own OUTSIDE caption above the reading,
+                    // so a corner label here would only repeat it.
+                    "TEMPERATURE" -> ""
                     else          -> w.id
                 }
 
@@ -530,20 +523,13 @@ fun HomeScreen(
                             isDayMode = isDayMode,
                             modifier  = Modifier.fillMaxSize()
                         )
-                        "APP_SHORTCUT_1", "APP_SHORTCUT_2" -> {
-                            val tileIndex = if (w.id == "APP_SHORTCUT_1") 0 else 1
-                            AppShortcutWidget(
-                                tile             = settings.appShortcutTiles.getOrNull(tileIndex)
-                                    ?: com.openlauncher.app.data.AppTileConfig(),
-                                accent           = accent,
-                                installedIconFor = installedIconFor,
-                                onLaunch         = onLaunchApp,
-                                onAssign         = { onAssignAppTile(tileIndex) },
-                                isDayMode        = isDayMode,
-                                isEditing        = editMode,
-                                modifier         = Modifier.fillMaxSize()
-                            )
-                        }
+                        "TEMPERATURE" -> TemperatureWidget(
+                            ambientTempC = vehicle.ambientTempC,
+                            accent       = accent,
+                            metric       = settings.unitSystem.name == "METRIC",
+                            isDayMode    = isDayMode,
+                            modifier     = Modifier.fillMaxSize()
+                        )
                     }
 
                     // Label — hide when album art fills the widget background
@@ -910,9 +896,8 @@ private fun WidgetLibraryDialog(
         if (settings.showTripTracker) add("TRIP_TRACKER")
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
+        if (settings.showTemperature) add("TEMPERATURE")
         if (settings.showMap) add("MAP")
-        if (settings.showAppShortcut1) add("APP_SHORTCUT_1")
-        if (settings.showAppShortcut2) add("APP_SHORTCUT_2")
     }
     val canAdd = canAddWidget(settings)
 
