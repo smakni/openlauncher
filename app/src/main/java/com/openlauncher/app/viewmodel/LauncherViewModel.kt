@@ -45,6 +45,15 @@ private const val BEARING_SAVE_DELTA = 10f
 /** Roughly a hundred metres, past which the remembered position is worth updating. */
 private const val POSITION_SAVE_DEGREES = 0.001
 
+/**
+ * How long a remembered outside temperature stays worth showing.
+ *
+ * Long enough to cover a stop for fuel or a night's parking in settled weather,
+ * short enough that yesterday's warm afternoon is never presented as this
+ * morning's frost.
+ */
+private const val REMEMBERED_TEMP_MAX_AGE_MS = 3L * 60 * 60 * 1000
+
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsRepo = SettingsRepository(application)
@@ -122,11 +131,24 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
      * drifting around a diesel idle while parked.
      */
     val vehicle: StateFlow<VehicleState> =
-        kotlinx.coroutines.flow.combine(obdMgr.vehicle, canReader.vehicle) { obd, can ->
+        kotlinx.coroutines.flow.combine(
+            obdMgr.vehicle, canReader.vehicle, settingsRepo.settingsFlow
+        ) { obd, can, prefs ->
+            // Falls back to the temperature last seen, if it was seen recently.
+            // The decoder sends this only when it changes, so on a car that has
+            // been sitting there is nothing to send and the widget would stay
+            // blank for as long as the weather held. An hour old is still a
+            // better answer than none; a day old is not an answer at all, and a
+            // stale reading believed is worse than an empty one.
+            val remembered = prefs.lastAmbientTempC.toDouble()
+                .takeIf {
+                    prefs.lastAmbientTempAtMs > 0L &&
+                        System.currentTimeMillis() - prefs.lastAmbientTempAtMs < REMEMBERED_TEMP_MAX_AGE_MS
+                }
             obd.copy(
                 rpm = obd.rpm ?: can.engineRpm,
                 speedKph = obd.speedKph ?: can.speedKph,
-                ambientTempC = can.outsideTempC,
+                ambientTempC = can.outsideTempC ?: remembered,
                 fuelLevelPct = obd.fuelLevelPct,
                 fuelLitresCan = can.fuelRaw
                     ?.let { com.openlauncher.app.util.VendorIds.fuelLitres(it) },
@@ -134,6 +156,30 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 tempSensorPresent = can.tempSensorPresent
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, VehicleState())
+
+    /**
+     * Keeps the last outside temperature, so the next start has one to show.
+     *
+     * Written only when the value changes, which the decoder already ensures —
+     * so this costs one small write per genuine change in the weather rather
+     * than one per callback.
+     */
+    private fun rememberAmbientTemperature() {
+        viewModelScope.launch {
+            canReader.vehicle
+                .map { it.outsideTempC }
+                .filterNotNull()
+                .distinctUntilChanged()
+                .collect { celsius ->
+                    updateSettings {
+                        copy(
+                            lastAmbientTempC = celsius.toFloat(),
+                            lastAmbientTempAtMs = System.currentTimeMillis()
+                        )
+                    }
+                }
+        }
+    }
 
     val obdStatus: StateFlow<ObdStatus>    = obdMgr.status
 
@@ -788,6 +834,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         // not a dongle is fitted, so there is nothing to wait for and no setting
         // to gate it behind.
         runCatching { canReader.start() }
+        rememberAmbientTemperature()
 
         loadInstalledApps()
         refreshConnectivity()

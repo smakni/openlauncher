@@ -157,7 +157,19 @@ class CanVehicleReader(private val context: Context) {
                 apply(updateId, value)
             }
         }
-        runCatching { remote.register(callback, id, 0) }
+        // The third argument, one rather than zero.
+        //
+        // get() is not the way in: the service answers null for every canbus
+        // data id, and the vendor's own application never calls it for them
+        // either — it keeps a local array filled entirely by these callbacks.
+        // Its UI layer registers with a flag of one, which it defines as "fire
+        // immediately with what is held" rather than waiting for a change. The
+        // same argument exists on the service call, and the same meaning is the
+        // obvious reading of it.
+        //
+        // It stays a subscription either way, so a wrong guess costs a flag the
+        // service ignores. Nothing here can reconfigure the CAN box.
+        runCatching { remote.register(callback, id, 1) }
             .onSuccess { synchronized(callbacks) { callbacks += id to callback } }
     }
 
@@ -186,7 +198,16 @@ class CanVehicleReader(private val context: Context) {
                 // the engine running, which may be several minutes after the
                 // launcher starts, and giving up before then would waste the
                 // one chance to do it.
-                delay(if (attempt < 15) REFRESH_INTERVAL_MS else SLOW_INTERVAL_MS)
+                // Quick, then brisk, then patient. The seconds after a cold
+                // start are when the decoder has not yet polled the car, and
+                // they are also exactly when someone is watching the screen.
+                delay(
+                    when {
+                        attempt < FAST_ATTEMPTS -> FAST_INTERVAL_MS
+                        attempt < 15 -> REFRESH_INTERVAL_MS
+                        else -> SLOW_INTERVAL_MS
+                    }
+                )
                 val remote = module ?: return@launch
                 val missing = missingIds()
                 if (missing.isEmpty()) return@launch
@@ -320,6 +341,10 @@ class CanVehicleReader(private val context: Context) {
 
         /** The id range the diagnostic sweep covers, and that it works over. */
         const val ID_COUNT = 256
+
+        /** The first seconds after a start, while the decoder is still waking. */
+        const val FAST_ATTEMPTS = 8
+        const val FAST_INTERVAL_MS = 700L
 
         /** Long enough that a car which answers normally never retries. */
         const val REFRESH_INTERVAL_MS = 4_000L

@@ -157,7 +157,14 @@ data class AppSettings(
     val showFuel: Boolean = false,
     // Tank capacity, for turning the litres the decoder sends into a bar. The
     // car does not report it, and the Evoque diesel carries seventy.
-    val fuelTankLitres: Int = 70
+    val fuelTankLitres: Int = 70,
+    // The last outside temperature seen, and when it was seen. The decoder only
+    // sends on change, so a launcher that has just started waits — sometimes a
+    // long while — for a value the car has been holding steady all along. Kept
+    // for the same reason as the last heading and the last position: a blank at
+    // startup reads as broken rather than as pending.
+    val lastAmbientTempC: Float = 0f,
+    val lastAmbientTempAtMs: Long = 0L
 )
 
 fun defaultShortcuts() = listOf(

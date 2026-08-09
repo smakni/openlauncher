@@ -97,10 +97,17 @@ object SyuGet {
                 appendLine("ints=...   = a value, and the launcher's problem if unused")
                 appendLine()
                 ids.forEach { (id, name) ->
-                    val reply = get(remote, id)
                     append("%-5d %-28s ".format(id, name))
+                    val refusal = refusalFor(remote, id)
+                    val reply = if (refusal == null) get(remote, id) else null
                     when {
-                        reply == null -> append("no reply")
+                        // Told apart at last. The first report collapsed both
+                        // into "no reply", which is precisely the distinction it
+                        // existed to draw — a service that rejects the call and
+                        // one that accepts it and says it holds nothing are
+                        // different findings.
+                        refusal != null -> append(refusal)
+                        reply == null -> append("answered null")
                         reply.ints.isEmpty() && reply.floats.isEmpty() && reply.strings.isEmpty() ->
                             append("empty")
                         else -> {
@@ -118,6 +125,35 @@ object SyuGet {
             })
             file.absolutePath
         }.getOrElse { "report failed: " + it.javaClass.simpleName }
+
+    /**
+     * Why the call could not be made, or null if the service accepted it.
+     *
+     * Separated from decoding so a rejected transaction and an accepted one
+     * carrying nothing cannot be reported as the same thing.
+     */
+    private fun refusalFor(remote: IRemoteModule, id: Int): String? {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        return try {
+            data.writeInterfaceToken(DESCRIPTOR)
+            data.writeInt(id)
+            data.writeIntArray(null)
+            data.writeFloatArray(null)
+            data.writeStringArray(null)
+            if (!remote.asBinder().transact(TRANSACTION_GET, data, reply, 0)) {
+                "transaction refused"
+            } else {
+                reply.readException()
+                null
+            }
+        } catch (e: Exception) {
+            "${e.javaClass.simpleName}: ${e.message}"
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
 
     /**
      * Writes the raw reply bytes for ids that no layout fits.
