@@ -23,9 +23,10 @@ import androidx.compose.ui.unit.sp
  * check whether it is freezing — which is the question actually asked of it, and
  * one that should not require finding a row in a list.
  *
- * The reading comes from the CAN decoder in half degrees, so the decimal is
- * shown rather than rounded away: a still reading that steps a whole degree at a
- * time reads as a sensor that cannot make its mind up.
+ * The decoder sends half degrees and the display rounds them to whole ones. The
+ * half is real, but it is not what the widget is for: the question is whether to
+ * take a coat, and a decimal place on a windscreen-level reading suggests a
+ * precision the sensor does not have.
  */
 @Composable
 fun TemperatureWidget(
@@ -73,7 +74,7 @@ fun TemperatureWidget(
             )
         } else {
             val shown =
-                if (metric) "%.1f".format(ambientTempC)
+                if (metric) "%.0f".format(ambientTempC)
                 else "%.0f".format(ambientTempC * 9 / 5 + 32)
 
             Text(

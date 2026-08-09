@@ -77,6 +77,7 @@ class SettingsRepository(private val context: Context) {
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
         val SHOW_TEMPERATURE      = booleanPreferencesKey("show_temperature")
         val SHOW_FUEL             = booleanPreferencesKey("show_fuel")
+        val FUEL_TANK_LITRES      = intPreferencesKey("fuel_tank_litres")
         val SPEEDOMETER_SHOW_TACHO = booleanPreferencesKey("speedometer_show_tacho")
     }
 
@@ -175,6 +176,7 @@ class SettingsRepository(private val context: Context) {
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
                 showTemperature  = prefs[Keys.SHOW_TEMPERATURE] ?: defaults.showTemperature,
                 showFuel         = prefs[Keys.SHOW_FUEL] ?: defaults.showFuel,
+                fuelTankLitres   = prefs[Keys.FUEL_TANK_LITRES] ?: defaults.fuelTankLitres,
                 speedometerShowTacho = prefs[Keys.SPEEDOMETER_SHOW_TACHO]
                     ?: defaults.speedometerShowTacho
             )
@@ -250,6 +252,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
             prefs[Keys.SHOW_TEMPERATURE]    = s.showTemperature
             prefs[Keys.SHOW_FUEL]           = s.showFuel
+            prefs[Keys.FUEL_TANK_LITRES]    = s.fuelTankLitres
             prefs[Keys.SPEEDOMETER_SHOW_TACHO] = s.speedometerShowTacho
     }
 

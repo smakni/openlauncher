@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -64,14 +65,20 @@ private const val MARKER_MAX_ZOOM = 19.0
 private const val SURFACE_SETTLE_MS = 700L
 
 /**
- * Slightly longer than the second between GPS fixes.
+ * How quickly the camera closes on the last fix, as a time constant.
  *
- * Matched exactly, each ease finishes just before the next begins and the map
- * comes to rest for an instant every second — a stutter that reads as lag.
- * Overrunning means the next fix interrupts a still-moving camera, which is
- * what makes the motion continuous.
+ * Roughly two thirds of the remaining distance is covered in this long. Shorter
+ * tracks the car more tightly and passes the jitter of the fix straight through;
+ * longer is smoother and lags visibly into corners. Half a second sits where
+ * neither is noticeable.
  */
-private const val CAMERA_EASE_MS = 1150
+private const val FOLLOW_TAU_S = 0.5f
+
+/** About a centimetre of latitude: below this, moving the camera shows nothing. */
+private const val SETTLED_DEGREES = 0.0000001
+
+/** Below a tenth of a degree the map is not visibly turning. */
+private const val SETTLED_DEGREES_BEARING = 0.1f
 
 /**
  * The box searched for roads, as offsets from the marker in pixels.
@@ -119,6 +126,19 @@ private object MapViewHolder {
      */
     val following = mutableStateOf(true)
     val zoom = mutableStateOf(DEFAULT_ZOOM)
+
+    /**
+     * Where the camera is heading, written once a fix and read every frame.
+     *
+     * Held here for the same reason as the rest: the follow loop outlives any
+     * one composition, and a target owned by a composition that has been
+     * replaced is a target nothing updates.
+     */
+    val targetLat = androidx.compose.runtime.mutableDoubleStateOf(0.0)
+    val targetLon = androidx.compose.runtime.mutableDoubleStateOf(0.0)
+    val targetBearing = androidx.compose.runtime.mutableFloatStateOf(0f)
+    val targetZoom = androidx.compose.runtime.mutableDoubleStateOf(DEFAULT_ZOOM)
+    val hasTarget = mutableStateOf(false)
 
     fun obtain(context: android.content.Context): MapView {
         MapLibre.getInstance(context.applicationContext)
@@ -276,18 +296,87 @@ fun MapWidget(
         // here, so it is refused before being handed over.
         if (!target.latitude.isFinite() || !target.longitude.isFinite()) return@LaunchedEffect
 
-        val camera = CameraPosition.Builder()
-            .target(target)
-            .zoom(zoom)
-            // The map turns and the vehicle stays pointing up the screen, which
-            // is what makes a moving map readable at a glance.
-            .bearing(bearing.toDouble())
-            .build()
-        // Eased across the interval between fixes rather than set outright.
-        // Assigning the position jumped the map once a second; this makes the
-        // same data read as movement.
-        runCatching {
-            map.easeCamera(CameraUpdateFactory.newCameraPosition(camera), CAMERA_EASE_MS)
+        // Published for the follow loop rather than applied here. Snapping is
+        // expensive — it queries rendered features — so it stays on the fix,
+        // once a second, while the motion it feeds runs every frame.
+        MapViewHolder.targetLat.doubleValue = target.latitude
+        MapViewHolder.targetLon.doubleValue = target.longitude
+        MapViewHolder.targetBearing.floatValue = bearing
+        MapViewHolder.targetZoom.doubleValue = zoom
+        MapViewHolder.hasTarget.value = true
+    }
+
+    /**
+     * Moves the camera toward the last fix, every frame.
+     *
+     * Easing to each new fix looked right and was not: an ease is an
+     * accelerate-then-decelerate curve, and a fresh one every second cut the
+     * previous mid-flight and restarted it from a standstill. The result is a
+     * camera that repeatedly slows and lunges — the juddering, at exactly one
+     * cycle per second.
+     *
+     * This instead keeps a target and closes the remaining distance by a fixed
+     * proportion of the time elapsed, which is the same maths as a low-pass
+     * filter. There is no beginning and no end to interrupt, so a new fix simply
+     * moves the target and the motion never breaks stride. It also degrades
+     * gracefully: a fix that arrives late leaves the camera still gliding toward
+     * the last known position rather than frozen.
+     */
+    LaunchedEffect(mapRef, following) {
+        val map = mapRef ?: return@LaunchedEffect
+        if (!following) return@LaunchedEffect
+
+        var lastFrameNs = 0L
+        while (true) {
+            withFrameNanos { now ->
+                val dt = if (lastFrameNs == 0L) 0f else (now - lastFrameNs) / 1_000_000_000f
+                lastFrameNs = now
+                if (dt <= 0f || !MapViewHolder.hasTarget.value) return@withFrameNanos
+
+                val current = map.cameraPosition
+                // Fraction of the gap closed this frame. Framed as a time
+                // constant rather than a per-frame fraction so the speed of the
+                // motion does not change with the frame rate.
+                val alpha = (1f - kotlin.math.exp(-dt / FOLLOW_TAU_S)).toDouble()
+
+                val lat = current.target?.latitude ?: MapViewHolder.targetLat.doubleValue
+                val lon = current.target?.longitude ?: MapViewHolder.targetLon.doubleValue
+                val newLat = lat + (MapViewHolder.targetLat.doubleValue - lat) * alpha
+                val newLon = lon + (MapViewHolder.targetLon.doubleValue - lon) * alpha
+
+                // Taken the short way round. Interpolating 350° toward 10°
+                // through the intervening numbers spins the map most of a turn
+                // for a ten degree change.
+                val from = current.bearing
+                var delta = MapViewHolder.targetBearing.floatValue - from
+                while (delta > 180) delta -= 360
+                while (delta < -180) delta += 360
+                val newBearing = from + delta * alpha
+
+                if (!newLat.isFinite() || !newLon.isFinite()) return@withFrameNanos
+                // Close enough to be indistinguishable, and worth skipping: a
+                // camera write per frame while parked keeps the GPU busy for a
+                // movement of centimetres.
+                val settled = kotlin.math.abs(newLat - MapViewHolder.targetLat.doubleValue) < SETTLED_DEGREES &&
+                    kotlin.math.abs(newLon - MapViewHolder.targetLon.doubleValue) < SETTLED_DEGREES &&
+                    kotlin.math.abs(delta) < SETTLED_DEGREES_BEARING
+                if (settled) return@withFrameNanos
+
+                runCatching {
+                    map.moveCamera(
+                        CameraUpdateFactory.newCameraPosition(
+                            CameraPosition.Builder()
+                                .target(LatLng(newLat, newLon))
+                                .zoom(MapViewHolder.targetZoom.doubleValue)
+                                // The map turns and the vehicle stays pointing up
+                                // the screen, which is what makes a moving map
+                                // readable at a glance.
+                                .bearing(newBearing)
+                                .build()
+                        )
+                    )
+                }
+            }
         }
     }
 

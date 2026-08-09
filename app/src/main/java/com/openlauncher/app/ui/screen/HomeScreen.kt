@@ -533,8 +533,9 @@ fun HomeScreen(
                             modifier  = Modifier.fillMaxSize()
                         )
                         "FUEL" -> FuelWidget(
+                            fuelLitresCan = vehicle.fuelLitresCan,
                             fuelLevelPct = vehicle.fuelLevelPct,
-                            fuelRawCan   = vehicle.fuelRawCan,
+                            tankLitres   = settings.fuelTankLitres,
                             canConnected = vehicle.canConnected,
                             accent       = accent,
                             isDayMode    = isDayMode,

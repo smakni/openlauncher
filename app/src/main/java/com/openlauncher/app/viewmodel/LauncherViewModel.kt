@@ -127,9 +127,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 rpm = obd.rpm ?: can.engineRpm,
                 speedKph = obd.speedKph ?: can.speedKph,
                 ambientTempC = can.outsideTempC,
-                fuelLevelPct = obd.fuelLevelPct
-                    ?: can.fuelRaw?.let { com.openlauncher.app.util.VendorIds.fuelPercent(it) }?.toFloat(),
-                fuelRawCan = can.fuelRaw,
+                fuelLevelPct = obd.fuelLevelPct,
+                fuelLitresCan = can.fuelRaw
+                    ?.let { com.openlauncher.app.util.VendorIds.fuelLitres(it) },
                 canConnected = can.connected,
                 tempSensorPresent = can.tempSensorPresent
             )

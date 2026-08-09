@@ -21,23 +21,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Fuel remaining, as a bar.
+ * Fuel remaining, in litres.
  *
- * The scale is the open question here, not the reading. The decoder declares a
- * fuel id and this car answers it, but nothing establishes what the number
- * means — a percentage, a byte fraction, litres, or a count of bars on the
- * dashboard gauge. A percentage is assumed where the value could be one, and
- * the raw number is printed underneath so the assumption can be checked against
- * the dashboard rather than trusted.
+ * A volume, not a percentage — the vendor's own car-information screen prints
+ * this id as "%d L" with nothing applied to it. The percentage the earlier
+ * version assumed would not have been caught by looking: a quarter of this car's
+ * tank is about seventeen litres, and seventeen percent is a believable reading.
  *
- * Where the value cannot be a percentage the bar is withheld entirely. Drawing
- * a gauge from a scale known to be wrong is worse than drawing none: a wrong
- * fuel gauge is believed until the car stops.
+ * The bar needs a capacity the car does not send, so it comes from settings. The
+ * litres are what the car actually said and are shown as the reading; the bar is
+ * a convenience drawn on top of an assumption, which is why the number is the
+ * larger of the two.
  */
 @Composable
 fun FuelWidget(
+    fuelLitresCan: Int?,
     fuelLevelPct: Float?,
-    fuelRawCan: Int?,
+    tankLitres: Int,
     canConnected: Boolean = false,
     accent: Color,
     isDayMode: Boolean = false,
@@ -50,11 +50,20 @@ fun FuelWidget(
         if (isDayMode) Color(0xFFD9D5CE)
         else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.10f)
 
+    // The decoder is preferred over the dongle here, unlike everywhere else:
+    // litres are what the car measures, and the OBD percentage is derived from
+    // the same float by a module that does not know the tank size either.
+    val fraction = when {
+        fuelLitresCan != null && tankLitres > 0 ->
+            (fuelLitresCan.toFloat() / tankLitres).coerceIn(0f, 1f)
+        fuelLevelPct != null -> (fuelLevelPct / 100f).coerceIn(0f, 1f)
+        else -> null
+    }
+
     // Below a sixth of a tank the bar turns amber. The dashboard has its own
-    // warning lamp, but that one fires late and this is the widget that is
-    // being looked at when a detour is still a choice.
-    val low = fuelLevelPct != null && fuelLevelPct <= 15f
-    val barColor = if (low) Color(0xFFD59A3C) else accent
+    // warning lamp, but that one fires late and this is the widget being looked
+    // at while a detour is still a choice.
+    val barColor = if (fraction != null && fraction <= 0.15f) Color(0xFFD59A3C) else accent
 
     Column(
         modifier = modifier.padding(horizontal = 12.dp, vertical = 10.dp).fillMaxSize(),
@@ -64,49 +73,24 @@ fun FuelWidget(
         Text("FUEL", color = labelColor, fontSize = 9.sp, letterSpacing = 2.sp)
 
         when {
+            fuelLitresCan != null -> {
+                Text(
+                    "$fuelLitresCan",
+                    color = barColor,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Light
+                )
+                Text("LITRES", color = labelColor, fontSize = 9.sp, letterSpacing = 1.5.sp)
+            }
+
             fuelLevelPct != null -> {
                 Text(
                     "%.0f%%".format(fuelLevelPct),
                     color = barColor,
-                    fontSize = 32.sp,
+                    fontSize = 34.sp,
                     fontWeight = FontWeight.Light
                 )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(trackColor)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth((fuelLevelPct / 100f).coerceIn(0f, 1f))
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(barColor)
-                    )
-                }
-
-                // Printed until the scale is confirmed, then removed. It is the
-                // only thing that lets the assumption be tested: read it against
-                // the dashboard gauge once, and either it agrees or it does not.
-                fuelRawCan?.let {
-                    Text("raw $it", color = labelColor, fontSize = 8.sp)
-                }
-            }
-
-            // A value the decoder sent that cannot be a percentage. Shown as
-            // itself rather than forced into a gauge, because knowing the scale
-            // is wrong is the useful part.
-            fuelRawCan != null -> {
-                Text(
-                    "$fuelRawCan",
-                    color = accent,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Light
-                )
-                Text("raw · scale unknown", color = labelColor, fontSize = 8.sp)
+                Text("FROM OBD", color = labelColor, fontSize = 9.sp, letterSpacing = 1.5.sp)
             }
 
             else -> {
@@ -115,6 +99,31 @@ fun FuelWidget(
                     if (canConnected) "CAN silent on fuel" else "CAN not connected",
                     color = labelColor,
                     fontSize = 9.sp
+                )
+            }
+        }
+
+        fraction?.let { f ->
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(trackColor)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(f)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(barColor)
+                )
+            }
+            if (fuelLitresCan != null) {
+                Text(
+                    "of $tankLitres L",
+                    color = labelColor,
+                    fontSize = 8.sp
                 )
             }
         }

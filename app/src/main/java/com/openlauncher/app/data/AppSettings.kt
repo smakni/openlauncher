@@ -154,7 +154,10 @@ data class AppSettings(
     val mapShowPlaces: Boolean = false,
     val showVehicle: Boolean = false,
     val showTemperature: Boolean = false,
-    val showFuel: Boolean = false
+    val showFuel: Boolean = false,
+    // Tank capacity, for turning the litres the decoder sends into a bar. The
+    // car does not report it, and the Evoque diesel carries seventy.
+    val fuelTankLitres: Int = 70
 )
 
 fun defaultShortcuts() = listOf(

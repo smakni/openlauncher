@@ -29,13 +29,13 @@ data class VehicleState(
     val boostBar: Float? = null,
     val fuelLevelPct: Float? = null,
     /**
-     * Fuel as the CAN decoder sends it, before any scale is assumed.
+     * Litres left in the tank, from the CAN decoder.
      *
-     * Kept alongside the percentage rather than folded into it: the scale is not
-     * yet confirmed, and a raw number on screen is what lets it be checked
-     * against the dashboard gauge. It goes once the scale is known.
+     * A volume rather than the percentage the OBD PID reports, and kept separate
+     * because they are different measurements: turning one into the other needs
+     * a tank capacity the car does not send.
      */
-    val fuelRawCan: Int? = null,
+    val fuelLitresCan: Int? = null,
     /**
      * Whether the CAN decoder service is bound.
      *
