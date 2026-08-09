@@ -1038,7 +1038,7 @@ fun SettingsScreen(
                 icon     = Icons.Default.Straighten
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf(10, 25, 50).forEach { km ->
+                    listOf(25, 75, 150, 300).forEach { km ->
                         FilterChip(
                             selected = settings.offlineMapRadiusKm == km,
                             onClick  = { onUpdate { copy(offlineMapRadiusKm = km) } },
