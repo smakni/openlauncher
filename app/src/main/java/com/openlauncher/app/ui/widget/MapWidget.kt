@@ -43,7 +43,14 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
-private const val DEFAULT_ZOOM = 15.0
+/**
+ * Close enough to read street names on the first frame.
+ *
+ * Fifteen shows a district, which is the right scale for finding yourself on a
+ * map and the wrong one for driving on it — the level a moving map wants is the
+ * one where the next turning is legible.
+ */
+private const val DEFAULT_ZOOM = 16.5
 
 /**
  * Slightly longer than the second between GPS fixes.
@@ -295,7 +302,7 @@ fun MapWidget(
             )
         }
 
-        if (styleReady && location != null) Canvas(modifier = Modifier.size(30.dp)) {
+        if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
             val w = size.width
             val h = size.height
 
