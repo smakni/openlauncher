@@ -71,9 +71,6 @@ class CanVehicleReader(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var refreshJob: Job? = null
 
-    // Written once if the service answers nothing at all, so a silent failure
-    // leaves evidence rather than another guess.
-    @Volatile private var rawDumped = false
     @Volatile private var diagnosed = false
 
     private val connection = object : ServiceConnection {
@@ -124,24 +121,20 @@ class CanVehicleReader(private val context: Context) {
         module = remote
         _vehicle.update { it.copy(connected = true) }
 
-        // Every id, not the ten that are wanted.
+        // Two ranges, because the ids fall into two families.
         //
-        // The diagnostic sweep registers the whole range and it demonstrably
-        // receives outside temperature; ten targeted registrations receive only
-        // the ids that change on their own. The difference between them is the
-        // breadth of the subscription, so this copies the configuration that is
-        // known to work rather than the one that ought to be sufficient.
+        // Below 256 are the per-car signals the decoder class names, which
+        // differ between CAN boxes. From 1000 up is a block common to all of
+        // them — capabilities, and a speed and engine speed that do not depend
+        // on the car at all. Only the first range was ever subscribed, so
+        // everything in the second was invisible: whether this car even has an
+        // outside sensor, and a second source for two readings that matter.
         //
-        // The cost is 256 callbacks instead of ten. Updates for ids nobody asked
-        // about fall through the when in apply() and cost nothing beyond a
-        // binder call that was already being made for the sweep.
+        // Updates for ids nobody asked about fall through the when in apply()
+        // and cost nothing beyond a binder call.
         (0 until ID_COUNT).forEach { id -> subscribeId(remote, id) }
+        (COMMON_ID_FIRST..COMMON_ID_LAST).forEach { id -> subscribeId(remote, id) }
 
-        // Asked for outright rather than waited for. The subscription only
-        // fires on change, so a value that has held steady since before the
-        // launcher started would otherwise never arrive at all.
-        fetch(remote, missingIds())
-        readSensorPresence(remote)
         startRefresh()
     }
 
@@ -212,9 +205,6 @@ class CanVehicleReader(private val context: Context) {
                 val missing = missingIds()
                 if (missing.isEmpty()) return@launch
 
-                fetch(remote, missing)
-                if (missingIds().isEmpty()) return@launch
-
                 // Once, after the car has had time to answer. A signal still
                 // absent by now is worth a written answer rather than another
                 // silent retry.
@@ -235,36 +225,6 @@ class CanVehicleReader(private val context: Context) {
                     subscribeId(remote, id)
                 }
             }
-        }
-    }
-
-    /** Reads the ids given, applying whatever the service answers. */
-    private fun fetch(remote: IRemoteModule, ids: List<Int>) {
-        ids.forEach { id ->
-            val reply = SyuGet.get(remote, id)
-            if (reply == null) {
-                if (!rawDumped) {
-                    rawDumped = true
-                    SyuGet.dumpRaw(context, remote, listOf(ID_ENGINE, ID_OUTSIDE_TEMP, ID_FUEL))
-                }
-                return@forEach
-            }
-            reply.ints.firstOrNull()?.let { apply(id, it) }
-        }
-    }
-
-    /**
-     * Asks whether this car has an outside temperature sensor at all.
-     *
-     * The vendor keeps a block of capability ids above 1000, separate from the
-     * per-car data ids, and this one answers the question the temperature widget
-     * cannot otherwise distinguish: a car with no sensor and a car whose reading
-     * has not arrived yet both show a blank. One is permanent and the other is a
-     * matter of waiting, and they deserve different words on screen.
-     */
-    private fun readSensorPresence(remote: IRemoteModule) {
-        SyuGet.get(remote, ID_EXIST_TEMP_OUT)?.ints?.firstOrNull()?.let { present ->
-            _vehicle.update { it.copy(tempSensorPresent = present != 0) }
         }
     }
 
@@ -332,12 +292,21 @@ class CanVehicleReader(private val context: Context) {
         const val ID_FUEL = 106
 
         /**
-         * Capability id, from the vendor's own FinalCanbus: whether the car
-         * reports an outside temperature. It sits in the block above 1000 that
-         * describes the installation rather than the drive, well outside the
-         * per-car range the decoder class defines.
+         * The block common to every CAN box, above the per-car ids.
+         *
+         * Documented up to 1036 by an independent implementation of this same
+         * interface, and the vendor sizes its own array at 1200. Subscribing a
+         * hundred covers the documented range with room for what is not.
          */
+        const val COMMON_ID_FIRST = 1000
+        const val COMMON_ID_LAST = 1099
+
+        /** Whether the car reports an outside temperature at all. */
         const val ID_EXIST_TEMP_OUT = 1012
+
+        /** Speed and engine speed that do not depend on the car fitted. */
+        const val ID_COMMON_SPEED = 1031
+        const val ID_COMMON_ENGINE = 1032
 
         /** The id range the diagnostic sweep covers, and that it works over. */
         const val ID_COUNT = 256
@@ -359,6 +328,8 @@ class CanVehicleReader(private val context: Context) {
         /** Asked about by name, so the report reads without a lookup table. */
         val DIAGNOSTIC_IDS = listOf(
             ID_FUEL to "fuel remaining (litres)",
+            ID_COMMON_SPEED to "speed (common block)",
+            ID_COMMON_ENGINE to "engine speed (common block)",
             ID_OUTSIDE_TEMP to "outside temperature",
             ID_ENGINE to "engine speed",
             ID_SPEED to "vehicle speed",
