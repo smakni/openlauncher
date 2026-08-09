@@ -69,6 +69,12 @@ class CanVehicleReader(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var refreshJob: Job? = null
 
+    // Whether the reply layout of get() has been checked against a value known
+    // from the callback. Until it has, get() is called only to prove itself and
+    // never to fill a reading.
+    @Volatile private var layoutProven = false
+    @Volatile private var rawDumped = false
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             toolkit = IRemoteToolkit.Stub.asInterface(binder)
@@ -167,11 +173,27 @@ class CanVehicleReader(private val context: Context) {
     private fun startRefresh() {
         refreshJob?.cancel()
         refreshJob = scope.launch {
-            repeat(REFRESH_ATTEMPTS) {
-                delay(REFRESH_INTERVAL_MS)
+            repeat(REFRESH_ATTEMPTS) { attempt ->
+                // Brisk at first, then patient. A car that answers normally is
+                // done inside the first minute; proving the get() layout needs
+                // the engine running, which may be several minutes after the
+                // launcher starts, and giving up before then would waste the
+                // one chance to do it.
+                delay(if (attempt < 15) REFRESH_INTERVAL_MS else SLOW_INTERVAL_MS)
                 val remote = module ?: return@launch
                 val missing = missingIds()
                 if (missing.isEmpty()) return@launch
+
+                // Asking outright beats waiting for a change, but only once the
+                // reply can be trusted — so proving the layout comes first and
+                // nothing is applied from get() until it succeeds.
+                if (!layoutProven) proveLayout(remote)
+                if (layoutProven) {
+                    missing.forEach { id ->
+                        SyuGet.get(remote, id)?.ints?.firstOrNull()?.let { apply(id, it) }
+                    }
+                    if (missingIds().isEmpty()) return@launch
+                }
                 missing.forEach { id ->
                     // Released first: registering twice for the same id would
                     // leave a callback behind that nothing ever unregisters.
@@ -186,6 +208,45 @@ class CanVehicleReader(private val context: Context) {
                 }
             }
         }
+    }
+
+    /**
+     * Checks the decoded reply against a value already known by another route.
+     *
+     * A parcel read with the wrong field layout returns numbers rather than an
+     * error, so nothing about a successful decode says it is correct. The only
+     * honest test is to ask for something the answer to is already known: get
+     * the engine speed and compare it against what the callback is reporting
+     * for the same id at the same moment. Two independent paths agreeing on a
+     * number that is neither round nor zero is not a coincidence.
+     *
+     * Which is why a stationary engine cannot prove anything — zero matches
+     * zero whatever the layout — so proof waits for the car to be running. Until
+     * then get() is simply not used, and the subscription retry carries on.
+     */
+    private fun proveLayout(remote: IRemoteModule) {
+        val reference = _vehicle.value.engineRpm?.takeIf { it > 0 }
+            ?: _vehicle.value.speedKph?.takeIf { it > 0 }
+            ?: return
+        val referenceId = if (_vehicle.value.engineRpm?.let { it > 0 } == true) ID_ENGINE else ID_SPEED
+
+        val answered = SyuGet.get(remote, referenceId)
+        if (answered == null) {
+            // No layout fit at all. The bytes are written once so the next
+            // attempt reads the layout off the evidence instead of guessing.
+            if (!rawDumped) {
+                rawDumped = true
+                SyuGet.dumpRaw(context, remote, listOf(ID_ENGINE, ID_OUTSIDE_TEMP, ID_FUEL))
+            }
+            return
+        }
+
+        val value = answered.ints.firstOrNull() ?: return
+        // Engine speed drifts between the two reads, so exact equality would
+        // reject a correct layout. The margin is wide enough to absorb that and
+        // far too narrow for an unrelated field to land inside by chance.
+        val tolerance = maxOf(150, reference / 5)
+        if (kotlin.math.abs(value - reference) <= tolerance) layoutProven = true
     }
 
     private fun missingIds(): List<Int> {
@@ -256,8 +317,10 @@ class CanVehicleReader(private val context: Context) {
 
         /** Long enough that a car which answers normally never retries. */
         const val REFRESH_INTERVAL_MS = 4_000L
-        /** Stops after roughly a minute; past that the car is not going to answer. */
-        const val REFRESH_ATTEMPTS = 15
+        /** Once the first minute is up; the engine may not be running yet. */
+        const val SLOW_INTERVAL_MS = 30_000L
+        /** A minute brisk, then twenty patient. Past that nothing is coming. */
+        const val REFRESH_ATTEMPTS = 55
 
     }
 }
