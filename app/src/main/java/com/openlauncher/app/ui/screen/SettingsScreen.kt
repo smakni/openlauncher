@@ -1042,9 +1042,11 @@ fun SettingsScreen(
                 icon     = Icons.Default.Landscape
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Beyond about sixty degrees the horizon enters the frame and
-                    // most of the tile is sky, so the range stops short of it.
-                    listOf(0, 30, 45, 60).forEach { degrees ->
+                    // Stops at fifty. Sixty put the horizon inside a tile this
+                    // short, and a screen point beyond the horizon has no ground
+                    // position — which is how the renderer was being handed an
+                    // infinite longitude and killed.
+                    listOf(0, 25, 40, 50).forEach { degrees ->
                         FilterChip(
                             selected = settings.mapTiltDegrees == degrees,
                             onClick  = { onUpdate { copy(mapTiltDegrees = degrees) } },

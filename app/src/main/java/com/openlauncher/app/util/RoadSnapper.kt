@@ -32,7 +32,17 @@ object RoadSnapper {
      * The nearest point on any of [roads] to [position], or null when the closest
      * is further than [thresholdMetres].
      */
-    fun snap(position: LatLng, roads: List<Feature>, thresholdMetres: Double): LatLng? {
+    fun snap(position: LatLng, roads: List<Feature>, thresholdMetres: Double): LatLng? =
+        snapInternal(position, roads, thresholdMetres)
+            // Geometry that came back from a pitched camera can carry infinities,
+            // and one of those reaching the renderer takes the process down.
+            ?.takeIf { it.latitude.isFinite() && it.longitude.isFinite() }
+
+    private fun snapInternal(
+        position: LatLng,
+        roads: List<Feature>,
+        thresholdMetres: Double
+    ): LatLng? {
         // Longitude degrees shorten towards the poles, so distances are scaled by
         // the cosine of the latitude. Without it a snap would reach much further
         // east-west than north-south.

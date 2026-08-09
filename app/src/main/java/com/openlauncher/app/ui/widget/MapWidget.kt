@@ -50,7 +50,7 @@ import org.maplibre.android.maps.Style
  * map and the wrong one for driving on it — the level a moving map wants is the
  * one where the next turning is legible.
  */
-private const val DEFAULT_ZOOM = 16.5
+private const val DEFAULT_ZOOM = 17.0
 
 /**
  * Slightly longer than the second between GPS fixes.
@@ -62,8 +62,21 @@ private const val DEFAULT_ZOOM = 16.5
  */
 private const val CAMERA_EASE_MS = 1150
 
-/** Half-width of the screen box searched for roads, in pixels. */
-private const val SNAP_QUERY_PX = 120f
+/**
+ * The box searched for roads, as offsets from the marker in pixels.
+ *
+ * It barely rises above the vehicle and reaches well below it. Symmetry was the
+ * bug: with the camera pitched, the upper edge of a centred box can fall beyond
+ * the horizon, where a screen point has no ground position at all. MapLibre
+ * unprojects it to an infinite longitude and the render thread dies —
+ * "longitude must not be infinite", which is exactly what the crash log says.
+ *
+ * Nothing is lost by the asymmetry. Snapping places the marker on the road it is
+ * standing on, not on one ahead, so the road above it was never the question.
+ */
+private const val SNAP_LEFT_PX = 110f
+private const val SNAP_ABOVE_PX = 20f
+private const val SNAP_BELOW_PX = 150f
 
 
 /**
@@ -199,8 +212,8 @@ fun MapWidget(
             val cx = mapView.width / 2f
             val cy = mapView.height / 2f
             val box = android.graphics.RectF(
-                cx - SNAP_QUERY_PX, cy - SNAP_QUERY_PX,
-                cx + SNAP_QUERY_PX, cy + SNAP_QUERY_PX
+                cx - SNAP_LEFT_PX, cy - SNAP_ABOVE_PX,
+                cx + SNAP_LEFT_PX, cy + SNAP_BELOW_PX
             )
             val roads = runCatching {
                 map.queryRenderedFeatures(box, *RoadSnapper.ROAD_LAYERS)
@@ -222,6 +235,11 @@ fun MapWidget(
             }.getOrDefault(0.0),
             viewportHeightPx = mapView.height
         ) ?: held
+
+        // Last line of defence. A non-finite coordinate reaching the renderer
+        // kills the render thread outright rather than raising anything catchable
+        // here, so it is refused before being handed over.
+        if (!target.latitude.isFinite() || !target.longitude.isFinite()) return@LaunchedEffect
 
         val camera = CameraPosition.Builder()
             .target(target)

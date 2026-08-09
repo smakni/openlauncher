@@ -56,6 +56,13 @@ class OfflineMapDownloader(private val context: Context) {
     private val manager: OfflineManager? by lazy {
         runCatching {
             MapLibre.getInstance(context)
+            // The offline downloader draws on the shared file source, and an
+            // inactive one accepts the region and then fetches nothing at all —
+            // no progress, no error. That is exactly what the log showed: one
+            // callback with the style still outstanding, then silence.
+            runCatching {
+                org.maplibre.android.storage.FileSource.getInstance(context).activate()
+            }
             OfflineManager.getInstance(context)
         }.getOrNull()
     }
