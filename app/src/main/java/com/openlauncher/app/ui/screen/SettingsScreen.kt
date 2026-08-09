@@ -41,6 +41,7 @@ import com.openlauncher.app.model.FuelType
 import com.openlauncher.app.model.ObdStatus
 import com.openlauncher.app.ui.theme.LocalDayMode
 import com.openlauncher.app.ui.theme.contrastOn
+import com.openlauncher.app.util.HomeRole
 import com.openlauncher.app.util.OfflineMapStore
 import com.openlauncher.app.util.SunriseSunset
 import kotlinx.coroutines.launch
@@ -185,6 +186,24 @@ fun SettingsScreen(
 
         // ── Permissions ──────────────────────────────────────────────────────
         SettingsSection("Permissions") {
+            // Re-read on every entry: the choice is made in a system screen
+            // this one does not come back through, so a cached value would be
+            // stale exactly when it is being checked.
+            val homePackage = HomeRole.currentHomePackage(context)
+            SettingsButton(
+                label    = "Default Home",
+                sublabel = when (homePackage) {
+                    context.packageName -> "Held by Open Launcher"
+                    null -> "Unknown — no home app resolved"
+                    else -> "Held by $homePackage — press to change"
+                },
+                icon     = Icons.Default.Home,
+                accent   = accent,
+                onClick  = { HomeRole.requestOrOpenChooser(context) }
+            )
+
+            SettingsDivider()
+
             val isMediaConnected by com.openlauncher.app.service.MediaListenerService.isConnected.collectAsState()
 
             // Bumped on ON_RESUME so statuses refresh when the user returns from
