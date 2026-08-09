@@ -57,6 +57,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Installed before anything else, so a fault during startup is still
+        // recorded. With no usable ADB on this unit, a crash that leaves no
+        // trace costs a build and a drive to guess at.
+        com.openlauncher.app.util.CrashLog.install(this)
         super.onCreate(savedInstanceState)
         hideSystemBars()
 

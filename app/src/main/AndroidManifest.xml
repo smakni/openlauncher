@@ -71,13 +71,23 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:windowSoftInputMode="adjustNothing">
+            android:windowSoftInputMode="adjustNothing"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true">
 
-            <!-- HOME launcher intent filters -->
+            <!-- The home role, on its own. Declaring LAUNCHER in the same filter
+                 makes some ROMs treat the activity as an ordinary app and leave
+                 it out of the home chooser entirely, which is what stopped it
+                 being selectable as the default. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.HOME" />
                 <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Separately, an entry in the app list. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

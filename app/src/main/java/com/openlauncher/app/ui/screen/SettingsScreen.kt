@@ -85,6 +85,11 @@ fun SettingsScreen(
     var canDbResult by remember { mutableStateOf<String?>(null) }
     var micResult by remember { mutableStateOf<String?>(null) }
     var tileTestResult by remember { mutableStateOf<String?>(null) }
+    // Read once on entry: the file is written by the handler of a process that
+    // is on its way out, so it cannot change while this screen is open.
+    var lastCrash by remember {
+        mutableStateOf(com.openlauncher.app.util.CrashLog.read(context))
+    }
 
     val probeScope = rememberCoroutineScope()
 
@@ -1265,6 +1270,23 @@ fun SettingsScreen(
                         file.writeText(text)
                         "saved to ${file.absolutePath}"
                     }.getOrElse { "failed: ${it.javaClass.simpleName}" }
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Last Crash",
+                sublabel = lastCrash
+                    ?.lineSequence()
+                    ?.firstOrNull { it.startsWith("when") }
+                    ?.plus(" — press to clear")
+                    ?: "None recorded",
+                icon     = Icons.Default.BugReport,
+                accent   = accent,
+                onClick  = {
+                    com.openlauncher.app.util.CrashLog.clear(context)
+                    lastCrash = null
                 }
             )
 
