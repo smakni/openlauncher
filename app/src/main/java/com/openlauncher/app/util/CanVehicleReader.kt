@@ -117,7 +117,18 @@ class CanVehicleReader(private val context: Context) {
         module = remote
         _vehicle.update { it.copy(connected = true) }
 
-        WATCHED.forEach { id -> subscribeId(remote, id) }
+        // Every id, not the ten that are wanted.
+        //
+        // The diagnostic sweep registers the whole range and it demonstrably
+        // receives outside temperature; ten targeted registrations receive only
+        // the ids that change on their own. The difference between them is the
+        // breadth of the subscription, so this copies the configuration that is
+        // known to work rather than the one that ought to be sufficient.
+        //
+        // The cost is 256 callbacks instead of ten. Updates for ids nobody asked
+        // about fall through the when in apply() and cost nothing beyond a
+        // binder call that was already being made for the sweep.
+        (0 until ID_COUNT).forEach { id -> subscribeId(remote, id) }
         startRefresh()
     }
 
@@ -240,14 +251,13 @@ class CanVehicleReader(private val context: Context) {
         const val ID_OUTSIDE_TEMP = 123
         const val ID_FUEL = 106
 
+        /** The id range the diagnostic sweep covers, and that it works over. */
+        const val ID_COUNT = 256
+
         /** Long enough that a car which answers normally never retries. */
         const val REFRESH_INTERVAL_MS = 4_000L
         /** Stops after roughly a minute; past that the car is not going to answer. */
         const val REFRESH_ATTEMPTS = 15
 
-        val WATCHED = listOf(
-            ID_DIPPED, ID_MAIN_BEAM, ID_INDICATOR_L, ID_INDICATOR_R,
-            ID_HANDBRAKE, ID_SPEED, ID_ENGINE, ID_GEAR, ID_OUTSIDE_TEMP, ID_FUEL
-        )
     }
 }
