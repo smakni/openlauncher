@@ -159,20 +159,9 @@ data class AppSettings(
     // it off; beyond it the raw fix is kept, so crossing a car park does not
     // put the marker confidently on a street it is not on.
     val roadSnapMetres: Int = 20,
-    // Camera pitch. Zero looks straight down; tilting trades some of the road
-    // ahead's width for distance, which is what makes a moving map read as
-    // depth rather than a diagram. Buildings are only raised when tilted —
-    // seen from directly above an extrusion is indistinguishable from a flat
-    // shape, so it would cost frames for nothing.
-    val mapTiltDegrees: Int = 0,
     // Points of interest — shops, stations, parks. Off by default: at speed
     // they are clutter, and the road labels are what actually help.
     val mapShowPlaces: Boolean = false,
-    // Seconds of road kept visible ahead. Zero disables the automatic zoom and
-    // leaves whatever level was last set. A time rather than a distance: what
-    // is worth seeing ahead is a reaction interval, so the zoom follows from
-    // the speed instead of being decided against it.
-    val mapAutoZoomSeconds: Int = 0,
     val showVehicle: Boolean = false,
     val showAppShortcut1: Boolean = false,
     val showAppShortcut2: Boolean = false,

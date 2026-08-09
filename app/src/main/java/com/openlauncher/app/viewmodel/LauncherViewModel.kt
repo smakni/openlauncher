@@ -75,7 +75,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             getApplication(),
             settings.value.pmtilesUrl,
             settings.value.tileUrlTemplate,
-            tilted = settings.value.mapTiltDegrees > 0,
             showPlaces = settings.value.mapShowPlaces,
             localTileTemplate = localTileTemplate()
         )

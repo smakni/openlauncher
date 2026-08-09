@@ -124,7 +124,14 @@ object OfflineMapStore {
             // downloading them, and preferring the network would leave the map
             // as dependent on a connection as before.
             localTileTemplate.isNotBlank() ->
-                """"tiles": ["$localTileTemplate"], "maxzoom": 15"""
+                // The declared maximum has to be the deepest level actually on
+                // disk. Claiming fifteen when the download stopped at thirteen
+                // makes the renderer ask for tiles that were never fetched, and
+                // those areas come out blank instead of being drawn larger from
+                // the level that does exist.
+                """"tiles": ["$localTileTemplate"], "maxzoom": ${
+                    localTileMaxZoom(context)
+                }"""
             tileUrlTemplate.isNotBlank() ->
                 """"tiles": ["${tileUrlTemplate.replace("\"", "\\\"")}"], "maxzoom": 15"""
             archive != null -> """"url": "pmtiles://file://${archive.absolutePath}""""
@@ -165,9 +172,12 @@ object OfflineMapStore {
         }
 
         if (showPlaces) {
-            // Appended last so the labels sit above everything, and the dots
-            // above the roads they mark rather than under them.
-            rebuilt.put(JSONObject(POI_DOTS))
+            // Labels only, appended last so they sit above everything.
+            //
+            // There was a circle layer under them and it had to go. Circles carry
+            // no collision detection while labels do, so at close range almost
+            // every name was dropped for overlapping and the map filled with
+            // orphaned dots — and a dot with no name says nothing at all.
             rebuilt.put(JSONObject(POI_LABELS))
         }
 
@@ -191,17 +201,13 @@ object OfflineMapStore {
          }}
     """
 
-    private const val POI_DOTS = """
-        {"id": "poi-dots", "type": "circle", "source": "protomaps",
-         "source-layer": "pois", "minzoom": 15,
-         "paint": {"circle-radius": 2.5, "circle-color": "#7c8899"}}
-    """
-
     private const val POI_LABELS = """
         {"id": "poi-labels", "type": "symbol", "source": "protomaps",
-         "source-layer": "pois", "minzoom": 15,
+         "source-layer": "pois", "minzoom": 16,
+         "filter": ["has", "name"],
          "layout": {
            "text-field": ["get", "name"],
+           "text-padding": 6,
            "text-font": ["Noto Sans Regular"],
            "text-size": 10,
            "text-anchor": "top",
@@ -214,6 +220,13 @@ object OfflineMapStore {
            "text-halo-width": 1.2
          }}
     """
+
+    /** The deepest zoom directory present under the downloaded tiles. */
+    fun localTileMaxZoom(context: Context): Int =
+        File(baseDir(context), "tiles").listFiles()
+            ?.mapNotNull { it.name.toIntOrNull() }
+            ?.maxOrNull()
+            ?: 15
 
     fun remove(context: Context, name: String): Boolean =
         File(baseDir(context), name).takeIf { it.isFile }?.delete() ?: false

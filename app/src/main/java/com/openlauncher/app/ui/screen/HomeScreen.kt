@@ -517,8 +517,6 @@ fun HomeScreen(
                                         it, settings.lastLongitude
                                     )
                                 },
-                            tiltDegrees = settings.mapTiltDegrees,
-                            autoZoomSeconds = settings.mapAutoZoomSeconds,
                             accent    = accent,
                             isDayMode = isDayMode,
                             isEditing = editMode,

@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.openlauncher.app.util.LocationData
-import com.openlauncher.app.util.AutoZoom
 import com.openlauncher.app.util.RoadSnapper
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
@@ -54,6 +53,12 @@ import org.maplibre.android.maps.Style
  * gain over 18 is size rather than information.
  */
 private const val DEFAULT_ZOOM = 20.0
+
+/** The marker grows with the scale, between these bounds. */
+private val MARKER_MIN_DP = 12.dp
+private val MARKER_MAX_DP = 26.dp
+private const val MARKER_MIN_ZOOM = 11.0
+private const val MARKER_MAX_ZOOM = 19.0
 
 /** Long enough for a re-attached GL surface to be live before it is queried. */
 private const val SURFACE_SETTLE_MS = 700L
@@ -99,6 +104,19 @@ private const val SNAP_BELOW_PX = 150f
 private object MapViewHolder {
     private var instance: MapView? = null
 
+    /**
+     * Whether the camera follows the vehicle, and the zoom it is at.
+     *
+     * Both live here rather than in the composition. The gesture listener can
+     * only be registered once for the life of the map, so it captured the state
+     * of whatever composition happened to be first — and every return from
+     * another screen built a new one. Panning then switched off a state nothing
+     * was reading while the live one stayed true, and the map recentred itself
+     * out from under the finger.
+     */
+    val following = mutableStateOf(true)
+    val zoom = mutableStateOf(DEFAULT_ZOOM)
+
     fun obtain(context: android.content.Context): MapView {
         MapLibre.getInstance(context.applicationContext)
         return instance ?: MapView(context.applicationContext).also {
@@ -129,8 +147,6 @@ fun MapWidget(
     hasMapData: Boolean,
     roadSnapMetres: Int = 0,
     lastKnown: LatLng? = null,
-    tiltDegrees: Int = 0,
-    autoZoomSeconds: Int = 0,
     accent: Color,
     isDayMode: Boolean = false,
     isEditing: Boolean = false,
@@ -191,10 +207,9 @@ fun MapWidget(
     // position on a map that was not there.
     var styleReady by remember { mutableStateOf(false) }
 
-    // Whether the camera still follows the vehicle. Panning or zooming turns it
-    // off — otherwise the next fix, a second later, would drag the map straight
-    // back and make the gesture look broken.
-    var following by remember { mutableStateOf(true) }
+    // Held outside the composition — see MapViewHolder.
+    var following by MapViewHolder.following
+    val zoomNow by MapViewHolder.zoom
     // Held so the overlay controls can drive the camera; getMapAsync only
     // delivers it inside the view's own callback.
     var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
@@ -221,8 +236,7 @@ fun MapWidget(
     // in place instead of travelling. The road query paid the same price, several
     // times a second instead of once a fix.
     LaunchedEffect(
-        mapRef, location, bearing, tiltDegrees, autoZoomSeconds,
-        following, styleReady, surfaceSettled
+        mapRef, location, bearing, following, styleReady, surfaceSettled
     ) {
         val map = mapRef ?: return@LaunchedEffect
         if (!following) return@LaunchedEffect
@@ -250,20 +264,9 @@ fun MapWidget(
             RoadSnapper.snap(raw, roads, roadSnapMetres.toDouble()) ?: raw
         } else raw
 
-        // Keeps whatever zoom is in effect, so following again after a pinch does
-        // not snap back to the default.
-        val held = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
-        // Returning null means leave the camera alone, which covers standstill
-        // and drifts inside the deadband.
-        val zoom = AutoZoom.target(
-            speedMps = fix.speedMps,
-            horizonSeconds = autoZoomSeconds,
-            currentZoom = held,
-            currentMetresPerPixel = runCatching {
-                map.projection.getMetersPerPixelAtLatitude(fix.latitude)
-            }.getOrDefault(0.0),
-            viewportHeightPx = mapView.height
-        ) ?: held
+        // Whatever level is in effect is kept, so following again after a pinch
+        // does not snap back to the default.
+        val zoom = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
 
         // Last line of defence. A non-finite coordinate reaching the renderer
         // kills the render thread outright rather than raising anything catchable
@@ -276,10 +279,6 @@ fun MapWidget(
             // The map turns and the vehicle stays pointing up the screen, which
             // is what makes a moving map readable at a glance.
             .bearing(bearing.toDouble())
-            // Pitch trades some of the width of the road ahead for distance,
-            // which is what makes a moving map read as depth rather than as a
-            // diagram.
-            .tilt(tiltDegrees.toDouble())
             .build()
         // Eased across the interval between fixes rather than set outright.
         // Assigning the position jumped the map once a second; this makes the
@@ -342,7 +341,14 @@ fun MapWidget(
                         map.addOnCameraMoveStartedListener { reason ->
                             if (reason == org.maplibre.android.maps.MapLibreMap
                                     .OnCameraMoveStartedListener.REASON_API_GESTURE
-                            ) following = false
+                            ) MapViewHolder.following.value = false
+                        }
+                        // Read when movement settles rather than per frame: the
+                        // marker only needs resizing once the scale has stopped
+                        // changing, and a per-frame state write would recompose
+                        // the widget on every frame of every pan.
+                        map.addOnCameraIdleListener {
+                            MapViewHolder.zoom.value = map.cameraPosition.zoom
                         }
                     }
                 }
@@ -363,7 +369,18 @@ fun MapWidget(
             )
         }
 
-        if (styleReady && location != null) Canvas(modifier = Modifier.size(22.dp)) {
+        // Sized against the scale it stands on. At street level the arrow should
+        // cover roughly a vehicle's width of road; zoomed out to a region that
+        // same arrow would blanket a town, which reads as a claim about where
+        // the car is that the map cannot support.
+        val markerSize = androidx.compose.ui.unit.lerp(
+            MARKER_MIN_DP,
+            MARKER_MAX_DP,
+            ((zoomNow - MARKER_MIN_ZOOM) / (MARKER_MAX_ZOOM - MARKER_MIN_ZOOM))
+                .coerceIn(0.0, 1.0)
+                .toFloat()
+        )
+        if (styleReady && location != null) Canvas(modifier = Modifier.size(markerSize)) {
             val w = size.width
             val h = size.height
 
