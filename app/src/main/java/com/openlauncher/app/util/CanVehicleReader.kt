@@ -74,6 +74,7 @@ class CanVehicleReader(private val context: Context) {
     // Written once if the service answers nothing at all, so a silent failure
     // leaves evidence rather than another guess.
     @Volatile private var rawDumped = false
+    @Volatile private var diagnosed = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -192,6 +193,14 @@ class CanVehicleReader(private val context: Context) {
 
                 fetch(remote, missing)
                 if (missingIds().isEmpty()) return@launch
+
+                // Once, after the car has had time to answer. A signal still
+                // absent by now is worth a written answer rather than another
+                // silent retry.
+                if (attempt == DIAGNOSE_AFTER_ATTEMPT && !diagnosed) {
+                    diagnosed = true
+                    SyuGet.report(context, remote, DIAGNOSTIC_IDS)
+                }
                 missing.forEach { id ->
                     // Released first: registering twice for the same id would
                     // leave a callback behind that nothing ever unregisters.
@@ -318,6 +327,21 @@ class CanVehicleReader(private val context: Context) {
         const val SLOW_INTERVAL_MS = 30_000L
         /** A minute brisk, then twenty patient. Past that nothing is coming. */
         const val REFRESH_ATTEMPTS = 55
+
+        /** Roughly twenty seconds in: long enough to be a real answer. */
+        const val DIAGNOSE_AFTER_ATTEMPT = 5
+
+        /** Asked about by name, so the report reads without a lookup table. */
+        val DIAGNOSTIC_IDS = listOf(
+            ID_FUEL to "fuel remaining (litres)",
+            ID_OUTSIDE_TEMP to "outside temperature",
+            ID_ENGINE to "engine speed",
+            ID_SPEED to "vehicle speed",
+            ID_GEAR to "gear",
+            108 to "total mileage",
+            163 to "low fuel warning",
+            ID_EXIST_TEMP_OUT to "car has outside sensor"
+        )
 
     }
 }

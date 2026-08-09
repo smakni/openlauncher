@@ -75,6 +75,51 @@ object SyuGet {
     }
 
     /**
+     * Writes what each id actually answers, in words.
+     *
+     * "Still nothing" is not a finding, and without this that is all a missing
+     * reading amounts to. The distinction that matters is between a service that
+     * refuses the id, one that answers with an empty payload — meaning the car
+     * does not populate it — and one that answers with a number the launcher
+     * then mishandles. Those are three different problems and they look
+     * identical on a blank widget.
+     */
+    fun report(context: android.content.Context, remote: IRemoteModule, ids: List<Pair<Int, String>>): String =
+        runCatching {
+            val dir = File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
+            val file = File(dir, "syu-signals.txt")
+            file.writeText(buildString {
+                appendLine("What each id answers to get()")
+                appendLine("=".repeat(52))
+                appendLine()
+                appendLine("no reply   = the service refused the id")
+                appendLine("empty      = the id exists and this car does not fill it")
+                appendLine("ints=...   = a value, and the launcher's problem if unused")
+                appendLine()
+                ids.forEach { (id, name) ->
+                    val reply = get(remote, id)
+                    append("%-5d %-28s ".format(id, name))
+                    when {
+                        reply == null -> append("no reply")
+                        reply.ints.isEmpty() && reply.floats.isEmpty() && reply.strings.isEmpty() ->
+                            append("empty")
+                        else -> {
+                            append("ints=").append(reply.ints.joinToString(","))
+                            if (reply.floats.isNotEmpty()) {
+                                append(" floats=").append(reply.floats.joinToString(","))
+                            }
+                            if (reply.strings.isNotEmpty()) {
+                                append(" strings=").append(reply.strings.joinToString(","))
+                            }
+                        }
+                    }
+                    appendLine()
+                }
+            })
+            file.absolutePath
+        }.getOrElse { "report failed: " + it.javaClass.simpleName }
+
+    /**
      * Writes the raw reply bytes for ids that no layout fits.
      *
      * Without this a failed decode leaves nothing to work from, and the next

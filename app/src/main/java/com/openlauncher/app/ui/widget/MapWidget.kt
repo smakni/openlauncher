@@ -18,7 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -65,20 +64,14 @@ private const val MARKER_MAX_ZOOM = 19.0
 private const val SURFACE_SETTLE_MS = 700L
 
 /**
- * How quickly the camera closes on the last fix, as a time constant.
+ * Bounds on the ease, which otherwise follows the measured gap between fixes.
  *
- * Roughly two thirds of the remaining distance is covered in this long. Shorter
- * tracks the car more tightly and passes the jitter of the fix straight through;
- * longer is smoother and lags visibly into corners. Half a second sits where
- * neither is noticeable.
+ * The floor stops a burst of fixes becoming a flicker of overlapping eases; the
+ * ceiling stops a long gap — a tunnel, a cold start — committing the camera to a
+ * slow crawl across the distance it covered while blind.
  */
-private const val FOLLOW_TAU_S = 0.5f
-
-/** About a centimetre of latitude: below this, moving the camera shows nothing. */
-private const val SETTLED_DEGREES = 0.0000001
-
-/** Below a tenth of a degree the map is not visibly turning. */
-private const val SETTLED_DEGREES_BEARING = 0.1f
+private const val MIN_EASE_MS = 400
+private const val MAX_EASE_MS = 2000
 
 /**
  * The box searched for roads, as offsets from the marker in pixels.
@@ -139,6 +132,9 @@ private object MapViewHolder {
     val targetBearing = androidx.compose.runtime.mutableFloatStateOf(0f)
     val targetZoom = androidx.compose.runtime.mutableDoubleStateOf(DEFAULT_ZOOM)
     val hasTarget = mutableStateOf(false)
+
+    /** When the last fix was applied, to size the next ease against it. */
+    var lastFixAtMs = android.os.SystemClock.elapsedRealtime()
 
     fun obtain(context: android.content.Context): MapView {
         MapLibre.getInstance(context.applicationContext)
@@ -307,76 +303,60 @@ fun MapWidget(
     }
 
     /**
-     * Moves the camera toward the last fix, every frame.
+     * Glides to the last fix, with a linear ease per fix.
      *
-     * Easing to each new fix looked right and was not: an ease is an
-     * accelerate-then-decelerate curve, and a fresh one every second cut the
-     * previous mid-flight and restarted it from a standstill. The result is a
-     * camera that repeatedly slows and lunges — the juddering, at exactly one
-     * cycle per second.
+     * Three attempts, and the reasoning behind each is worth keeping. The
+     * default easeCamera is an accelerate-then-decelerate curve, so a fresh one
+     * every second cut the previous mid-flight and restarted it from a
+     * standstill: the camera slowed and lunged, once a second.
      *
-     * This instead keeps a target and closes the remaining distance by a fixed
-     * proportion of the time elapsed, which is the same maths as a low-pass
-     * filter. There is no beginning and no end to interrupt, so a new fix simply
-     * moves the target and the motion never breaks stride. It also degrades
-     * gracefully: a fix that arrives late leaves the camera still gliding toward
-     * the last known position rather than frozen.
+     * Driving the camera myself every frame fixed the curve and introduced a
+     * worse problem. moveCamera forces an immediate camera set and a redraw, and
+     * sixty of those a second on this hardware saturated the main thread — the
+     * map rendered no better and the rest of the interface stopped updating with
+     * it, which is what made the temperature widget appear to go blank.
+     *
+     * MapLibre already had the answer: easeCamera takes a flag that swaps the
+     * curve for a linear one. Constant velocity, chained fix to fix, at one
+     * camera call a second instead of sixty.
      */
-    LaunchedEffect(mapRef, following) {
+    LaunchedEffect(mapRef, location, bearing, following) {
         val map = mapRef ?: return@LaunchedEffect
-        if (!following) return@LaunchedEffect
+        if (!following || !MapViewHolder.hasTarget.value) return@LaunchedEffect
 
-        var lastFrameNs = 0L
-        while (true) {
-            withFrameNanos { now ->
-                val dt = if (lastFrameNs == 0L) 0f else (now - lastFrameNs) / 1_000_000_000f
-                lastFrameNs = now
-                if (dt <= 0f || !MapViewHolder.hasTarget.value) return@withFrameNanos
+        val target = LatLng(
+            MapViewHolder.targetLat.doubleValue,
+            MapViewHolder.targetLon.doubleValue
+        )
+        if (!target.latitude.isFinite() || !target.longitude.isFinite()) return@LaunchedEffect
 
-                val current = map.cameraPosition
-                // Fraction of the gap closed this frame. Framed as a time
-                // constant rather than a per-frame fraction so the speed of the
-                // motion does not change with the frame rate.
-                val alpha = (1f - kotlin.math.exp(-dt / FOLLOW_TAU_S)).toDouble()
+        // Measured rather than assumed. GPS caps near 1 Hz but delivers late
+        // under a poor sky, and an ease shorter than the real gap finishes early
+        // and leaves the map still for the remainder — the stutter this is meant
+        // to remove.
+        val now = android.os.SystemClock.elapsedRealtime()
+        val gap = (now - MapViewHolder.lastFixAtMs).toInt()
+        MapViewHolder.lastFixAtMs = now
+        val duration = gap.coerceIn(MIN_EASE_MS, MAX_EASE_MS)
 
-                val lat = current.target?.latitude ?: MapViewHolder.targetLat.doubleValue
-                val lon = current.target?.longitude ?: MapViewHolder.targetLon.doubleValue
-                val newLat = lat + (MapViewHolder.targetLat.doubleValue - lat) * alpha
-                val newLon = lon + (MapViewHolder.targetLon.doubleValue - lon) * alpha
-
-                // Taken the short way round. Interpolating 350° toward 10°
-                // through the intervening numbers spins the map most of a turn
-                // for a ten degree change.
-                val from = current.bearing
-                var delta = MapViewHolder.targetBearing.floatValue - from
-                while (delta > 180) delta -= 360
-                while (delta < -180) delta += 360
-                val newBearing = from + delta * alpha
-
-                if (!newLat.isFinite() || !newLon.isFinite()) return@withFrameNanos
-                // Close enough to be indistinguishable, and worth skipping: a
-                // camera write per frame while parked keeps the GPU busy for a
-                // movement of centimetres.
-                val settled = kotlin.math.abs(newLat - MapViewHolder.targetLat.doubleValue) < SETTLED_DEGREES &&
-                    kotlin.math.abs(newLon - MapViewHolder.targetLon.doubleValue) < SETTLED_DEGREES &&
-                    kotlin.math.abs(delta) < SETTLED_DEGREES_BEARING
-                if (settled) return@withFrameNanos
-
-                runCatching {
-                    map.moveCamera(
-                        CameraUpdateFactory.newCameraPosition(
-                            CameraPosition.Builder()
-                                .target(LatLng(newLat, newLon))
-                                .zoom(MapViewHolder.targetZoom.doubleValue)
-                                // The map turns and the vehicle stays pointing up
-                                // the screen, which is what makes a moving map
-                                // readable at a glance.
-                                .bearing(newBearing)
-                                .build()
-                        )
-                    )
-                }
-            }
+        runCatching {
+            map.easeCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(target)
+                        .zoom(MapViewHolder.targetZoom.doubleValue)
+                        // The map turns and the vehicle stays pointing up the
+                        // screen, which is what makes a moving map readable at a
+                        // glance.
+                        .bearing(MapViewHolder.targetBearing.floatValue.toDouble())
+                        .build()
+                ),
+                duration,
+                // Linear. This flag is the whole fix: with the default curve the
+                // camera decelerates into every fix and accelerates out of the
+                // next, which is the juddering.
+                false
+            )
         }
     }
 
