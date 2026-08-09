@@ -1135,7 +1135,7 @@ fun SettingsScreen(
                 sublabel = when (val d = mapDownload) {
                     is com.openlauncher.app.util.DownloadState.Idle ->
                         if (settings.tileUrlTemplate.isBlank())
-                            "Set a Tile URL above — a PMTiles archive cannot be enumerated"
+                            "Set a Tile URL above — tiles are fetched through it"
                         else "Needs a GPS fix and a connection"
                     is com.openlauncher.app.util.DownloadState.Running ->
                         "${d.percent}% — ${d.megabytes} MB — ${d.completed}/${d.required} tiles"

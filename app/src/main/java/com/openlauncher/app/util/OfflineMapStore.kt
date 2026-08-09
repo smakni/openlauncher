@@ -22,8 +22,14 @@ import java.io.File
  */
 object OfflineMapStore {
 
-    /** Archive formats MapLibre can read in place. */
-    private val SUPPORTED = setOf("pmtiles", "mbtiles")
+    /**
+     * Archive formats MapLibre can read in place.
+     *
+     * PMTiles only. The native library carries no MBTiles support whatever —
+     * searching the binary finds the one and not the other — so accepting an
+     * .mbtiles import only ever produced a file nothing could open.
+     */
+    private val SUPPORTED = setOf("pmtiles")
 
     fun baseDir(context: Context): File {
         val external = context.getExternalFilesDir(null)
@@ -96,26 +102,31 @@ object OfflineMapStore {
     ): Boolean =
         installedPmTiles(context) != null ||
             remotePmTilesUrl.isNotBlank() ||
-            tileUrlTemplate.isNotBlank()
+            tileUrlTemplate.isNotBlank() ||
+            // Downloaded tiles are a source in their own right, and the only one
+            // that survives losing the connection.
+            File(baseDir(context), "tiles").listFiles()?.any { it.isDirectory } == true
 
     fun resolvedStyleUri(
         context: Context,
         remotePmTilesUrl: String,
         tileUrlTemplate: String = "",
         tilted: Boolean = false,
-        showPlaces: Boolean = false
+        showPlaces: Boolean = false,
+        localTileTemplate: String = ""
     ): String {
         val archive = installedPmTiles(context)
         // A tile template wins over everything: it is the only source the region
         // downloader can enumerate, so choosing it is choosing that feature.
         // Otherwise an installed archive beats the remote build, being local.
         val sourceJson = when {
+            // Downloaded tiles win outright: having them is the whole point of
+            // downloading them, and preferring the network would leave the map
+            // as dependent on a connection as before.
+            localTileTemplate.isNotBlank() ->
+                """"tiles": ["$localTileTemplate"], "maxzoom": 15"""
             tileUrlTemplate.isNotBlank() ->
                 """"tiles": ["${tileUrlTemplate.replace("\"", "\\\"")}"], "maxzoom": 15"""
-            // The scheme has to match the container. Both were addressed as
-            // pmtiles, so an imported .mbtiles named a reader that cannot open it.
-            archive != null && archive.extension.lowercase() == "mbtiles" ->
-                """"url": "mbtiles://${archive.absolutePath}""""
             archive != null -> """"url": "pmtiles://file://${archive.absolutePath}""""
             else            -> """"url": "pmtiles://$remotePmTilesUrl""""
         }

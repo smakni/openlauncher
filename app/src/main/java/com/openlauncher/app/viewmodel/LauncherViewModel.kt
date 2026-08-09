@@ -53,8 +53,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     // Lazy: building this eagerly touched MapLibre before it was initialised
     // and crashed the launcher at startup.
     private val mapDownloader by lazy {
-        com.openlauncher.app.util.OfflineMapDownloader(getApplication())
+        com.openlauncher.app.util.TileDownloader(getApplication())
     }
+
+    /** The template downloaded tiles are served through, when any exist. */
+    private fun localTileTemplate(): String =
+        if (mapDownloader.hasTiles(getApplication())) {
+            mapDownloader.localTemplate(getApplication())
+        } else ""
     val mapDownload: StateFlow<com.openlauncher.app.util.DownloadState> = mapDownloader.state
 
     /**
@@ -67,7 +73,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             settings.value.pmtilesUrl,
             settings.value.tileUrlTemplate,
             tilted = settings.value.mapTiltDegrees > 0,
-            showPlaces = settings.value.mapShowPlaces
+            showPlaces = settings.value.mapShowPlaces,
+            localTileTemplate = localTileTemplate()
         )
     }.getOrDefault("")
 
@@ -81,13 +88,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     fun downloadMapAroundMe() {
         val fix = locationMgr.location.value ?: return
         mapDownloader.download(
-            styleUrl = mapStyleUri(),
-            centre   = org.maplibre.android.geometry.LatLng(fix.latitude, fix.longitude),
-            radiusKm = settings.value.offlineMapRadiusKm.toDouble()
+            scope     = viewModelScope,
+            template  = settings.value.tileUrlTemplate,
+            centreLat = fix.latitude,
+            centreLon = fix.longitude,
+            radiusKm  = settings.value.offlineMapRadiusKm.toDouble()
         )
     }
 
     fun clearDownloadedMaps() = mapDownloader.clear()
+
+    fun cancelMapDownload() = mapDownloader.cancel()
 
     // ── OBD-II ────────────────────────────────────────────────────────────────
     val vehicle:   StateFlow<VehicleState> = obdMgr.vehicle
