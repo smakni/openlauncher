@@ -10,6 +10,7 @@ import com.syu.ipc.IRemoteModule
 import com.syu.ipc.IRemoteToolkit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * Reads live vehicle data from the CAN decoder.
@@ -62,7 +63,7 @@ class CanVehicleReader(private val context: Context) {
         override fun onServiceDisconnected(name: ComponentName?) {
             toolkit = null
             module = null
-            _vehicle.value = _vehicle.value.copy(connected = false)
+            _vehicle.update { it.copy(connected = false) }
         }
     }
 
@@ -74,7 +75,7 @@ class CanVehicleReader(private val context: Context) {
         // Recorded rather than dropped. A failed bind and a silent car produce
         // the same empty screen, and telling them apart is the difference
         // between a wiring bug and a car that does not send the signal.
-        if (!bound) _vehicle.value = _vehicle.value.copy(connected = false)
+        if (!bound) _vehicle.update { it.copy(connected = false) }
     }
 
     fun stop() {
@@ -95,7 +96,7 @@ class CanVehicleReader(private val context: Context) {
             toolkit?.getRemoteModule(VendorIds.CANBUS_MODULE)
         }.getOrNull() ?: return
         module = remote
-        _vehicle.value = _vehicle.value.copy(connected = true)
+        _vehicle.update { it.copy(connected = true) }
 
         WATCHED.forEach { id ->
             val callback = object : IModuleCallback.Stub() {
@@ -114,21 +115,36 @@ class CanVehicleReader(private val context: Context) {
         }
     }
 
-    /** Values arrive on a binder thread; the state flow is safe to write there. */
+    /**
+     * Applies one reading, atomically.
+     *
+     * Each id has its own callback and they arrive on separate binder threads,
+     * so reading the state into a local and assigning a copy back loses updates:
+     * two threads read the same snapshot and the second write discards the
+     * first. That is not a rare race here, it is the normal case, and it fails
+     * in one direction — the id that re-sends constantly overwrites the one that
+     * does not. Engine speed survived while outside temperature and fuel, which
+     * are sent once and then sit still, were wiped within a second of arriving
+     * and never came back.
+     *
+     * `update` retries on a compare-and-set until its write lands on the state
+     * it was computed from, so a slow signal cannot be clobbered by a fast one.
+     */
     private fun apply(id: Int, value: Int) {
-        val current = _vehicle.value
-        _vehicle.value = when (id) {
-            ID_ENGINE -> current.copy(engineRpm = value)
-            ID_SPEED -> current.copy(speedKph = value)
-            ID_GEAR -> current.copy(gearRaw = value)
-            ID_OUTSIDE_TEMP -> current.copy(outsideTempC = VendorIds.outsideTempC(value))
-            ID_FUEL -> current.copy(fuelRaw = value)
-            ID_HANDBRAKE -> current.copy(handbrake = value != 0)
-            ID_DIPPED -> current.copy(dippedBeam = value != 0)
-            ID_MAIN_BEAM -> current.copy(mainBeam = value != 0)
-            ID_INDICATOR_L -> current.copy(indicatorLeft = value != 0)
-            ID_INDICATOR_R -> current.copy(indicatorRight = value != 0)
-            else -> current
+        _vehicle.update { current ->
+            when (id) {
+                ID_ENGINE -> current.copy(engineRpm = value)
+                ID_SPEED -> current.copy(speedKph = value)
+                ID_GEAR -> current.copy(gearRaw = value)
+                ID_OUTSIDE_TEMP -> current.copy(outsideTempC = VendorIds.outsideTempC(value))
+                ID_FUEL -> current.copy(fuelRaw = value)
+                ID_HANDBRAKE -> current.copy(handbrake = value != 0)
+                ID_DIPPED -> current.copy(dippedBeam = value != 0)
+                ID_MAIN_BEAM -> current.copy(mainBeam = value != 0)
+                ID_INDICATOR_L -> current.copy(indicatorLeft = value != 0)
+                ID_INDICATOR_R -> current.copy(indicatorRight = value != 0)
+                else -> current
+            }
         }
     }
 
