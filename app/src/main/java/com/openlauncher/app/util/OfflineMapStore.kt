@@ -112,6 +112,10 @@ object OfflineMapStore {
         val sourceJson = when {
             tileUrlTemplate.isNotBlank() ->
                 """"tiles": ["${tileUrlTemplate.replace("\"", "\\\"")}"], "maxzoom": 15"""
+            // The scheme has to match the container. Both were addressed as
+            // pmtiles, so an imported .mbtiles named a reader that cannot open it.
+            archive != null && archive.extension.lowercase() == "mbtiles" ->
+                """"url": "mbtiles://${archive.absolutePath}""""
             archive != null -> """"url": "pmtiles://file://${archive.absolutePath}""""
             else            -> """"url": "pmtiles://$remotePmTilesUrl""""
         }

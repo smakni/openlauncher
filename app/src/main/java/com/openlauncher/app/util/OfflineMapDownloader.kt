@@ -1,6 +1,7 @@
 package com.openlauncher.app.util
 
 import android.content.Context
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.maplibre.android.MapLibre
@@ -62,6 +63,27 @@ class OfflineMapDownloader(private val context: Context) {
     /** When the current download began, for the enumeration grace period. */
     private var startedAtMs = 0L
 
+    /**
+     * A record of what the download actually did.
+     *
+     * The percentage alone cannot distinguish a region that enumerated nothing
+     * from one enumerating thousands of tiles and fetching none — both read as
+     * zero. With no ADB there is no other way to see inside, and this has now
+     * cost several rounds of guessing.
+     */
+    private val log = StringBuilder()
+
+    private fun note(line: String) {
+        synchronized(log) {
+            if (log.length > LOG_LIMIT) return
+            log.append(line).appendLine()
+            runCatching {
+                val dir = File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
+                File(dir, "map-download.txt").writeText(log.toString())
+            }
+        }
+    }
+
     private val _state = MutableStateFlow<DownloadState>(DownloadState.Idle)
     val state: StateFlow<DownloadState> = _state
 
@@ -73,6 +95,24 @@ class OfflineMapDownloader(private val context: Context) {
         }
         startedAtMs = System.currentTimeMillis()
         _state.value = DownloadState.Running(0, 0, 0, 0)
+
+        synchronized(log) { log.setLength(0) }
+        note("Map region download")
+        note("=".repeat(52))
+        note("style   : $styleUrl")
+        note("centre  : ${centre.latitude}, ${centre.longitude}")
+        note("radius  : $radiusKm km")
+        note("zoom    : $MIN_ZOOM..$MAX_ZOOM")
+        // The source line is what determines whether anything can be enumerated
+        // at all, so it is recorded rather than inferred.
+        note("source  : " + runCatching {
+            File(styleUrl.removePrefix("file://")).readText()
+                .lineSequence()
+                .firstOrNull { it.contains("\"tiles\"") || it.contains("pmtiles://") }
+                ?.trim()
+                ?: "not found in style"
+        }.getOrElse { "unreadable: ${it.javaClass.simpleName}" })
+        note("")
 
         val definition = OfflineTilePyramidRegionDefinition(
             styleUrl,
@@ -92,6 +132,16 @@ class OfflineMapDownloader(private val context: Context) {
                     region.setObserver(object : OfflineRegion.OfflineRegionObserver {
                         override fun onStatusChanged(status: OfflineRegionStatus) {
                             val megabytes = status.completedResourceSize / 1_048_576
+                            note(
+                                "%6dms  required=%-8d completed=%-8d bytes=%-10d complete=%s"
+                                    .format(
+                                        System.currentTimeMillis() - startedAtMs,
+                                        status.requiredResourceCount,
+                                        status.completedResourceCount,
+                                        status.completedResourceSize,
+                                        status.isComplete
+                                    )
+                            )
                             _state.value = if (status.isComplete) {
                                 // Downloading is left active until complete, then
                                 // released: an active region keeps a connection
@@ -133,10 +183,15 @@ class OfflineMapDownloader(private val context: Context) {
                         }
 
                         override fun onError(error: OfflineRegionError) {
+                            // Recorded rather than only shown: these arrive per
+                            // failing resource, so the first is the useful one
+                            // and the row can only ever display the last.
+                            note("ERROR   reason=${error.reason} message=${error.message}")
                             _state.value = DownloadState.Failed(error.message ?: error.reason)
                         }
 
                         override fun mapboxTileCountLimitExceeded(limit: Long) {
+                            note("ERROR   tile count limit $limit exceeded")
                             _state.value =
                                 DownloadState.Failed("area too large (limit $limit tiles)")
                         }
@@ -145,6 +200,7 @@ class OfflineMapDownloader(private val context: Context) {
                 }
 
                 override fun onError(error: String) {
+                    note("ERROR   region not created: $error")
                     _state.value = DownloadState.Failed(error)
                 }
             }
@@ -196,5 +252,8 @@ class OfflineMapDownloader(private val context: Context) {
 
         /** Long enough for the style to be fetched and its tiles counted. */
         const val ENUMERATION_GRACE_MS = 20_000L
+
+        /** A stalled download reports forever; the first pages say everything. */
+        const val LOG_LIMIT = 24_000
     }
 }
