@@ -36,6 +36,8 @@ data class VehicleState(
      * a tank capacity the car does not send.
      */
     val fuelLitresCan: Int? = null,
+    /** The car's low-fuel lamp, where it reports one. */
+    val lowFuelWarning: Boolean? = null,
     /**
      * Whether the CAN decoder service is bound.
      *

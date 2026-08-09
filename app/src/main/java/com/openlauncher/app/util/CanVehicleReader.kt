@@ -42,8 +42,16 @@ class CanVehicleReader(private val context: Context) {
         /** Raw gear code. Meaning per car; not decoded until confirmed. */
         val gearRaw: Int? = null,
         val outsideTempC: Double? = null,
-        /** Fuel remaining, as the decoder sends it. Scale unconfirmed. */
+        /** Fuel remaining, in litres. This car sends zero and nothing else. */
         val fuelRaw: Int? = null,
+        /**
+         * The car's own low-fuel lamp.
+         *
+         * Worth carrying precisely because the level is not: it is the only
+         * fuel information this decoder gets from this car, and a warning that
+         * the car itself raised is worth more than a level it never sent.
+         */
+        val lowFuelWarning: Boolean? = null,
         val handbrake: Boolean? = null,
         val dippedBeam: Boolean? = null,
         val mainBeam: Boolean? = null,
@@ -262,6 +270,7 @@ class CanVehicleReader(private val context: Context) {
                 ID_GEAR -> current.copy(gearRaw = value)
                 ID_OUTSIDE_TEMP -> current.copy(outsideTempC = VendorIds.outsideTempC(value))
                 ID_FUEL -> current.copy(fuelRaw = value)
+            ID_FUEL_WARNING -> current.copy(lowFuelWarning = value != 0)
                 ID_HANDBRAKE -> current.copy(handbrake = value != 0)
                 ID_DIPPED -> current.copy(dippedBeam = value != 0)
                 ID_MAIN_BEAM -> current.copy(mainBeam = value != 0)
@@ -290,6 +299,7 @@ class CanVehicleReader(private val context: Context) {
         const val ID_GEAR = 131
         const val ID_OUTSIDE_TEMP = 123
         const val ID_FUEL = 106
+        const val ID_FUEL_WARNING = 163
 
         /**
          * The block common to every CAN box, above the per-car ids.

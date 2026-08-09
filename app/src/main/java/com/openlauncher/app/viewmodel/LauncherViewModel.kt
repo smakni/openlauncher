@@ -152,6 +152,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 fuelLevelPct = obd.fuelLevelPct,
                 fuelLitresCan = can.fuelRaw
                     ?.let { com.openlauncher.app.util.VendorIds.fuelLitres(it) },
+                lowFuelWarning = can.lowFuelWarning,
                 canConnected = can.connected,
                 tempSensorPresent = can.tempSensorPresent
             )

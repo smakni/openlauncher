@@ -536,6 +536,7 @@ fun HomeScreen(
                             fuelLitresCan = vehicle.fuelLitresCan,
                             fuelLevelPct = vehicle.fuelLevelPct,
                             tankLitres   = settings.fuelTankLitres,
+                            lowFuelWarning = vehicle.lowFuelWarning,
                             canConnected = vehicle.canConnected,
                             accent       = accent,
                             isDayMode    = isDayMode,

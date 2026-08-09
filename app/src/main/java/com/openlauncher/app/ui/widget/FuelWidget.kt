@@ -38,6 +38,7 @@ fun FuelWidget(
     fuelLitresCan: Int?,
     fuelLevelPct: Float?,
     tankLitres: Int,
+    lowFuelWarning: Boolean? = null,
     canConnected: Boolean = false,
     accent: Color,
     isDayMode: Boolean = false,
@@ -93,10 +94,31 @@ fun FuelWidget(
                 Text("FROM OBD", color = labelColor, fontSize = 9.sp, letterSpacing = 1.5.sp)
             }
 
+            // The car raises a low-fuel lamp and reports no level. That is the
+            // whole of what it says about fuel, so it is what gets shown —
+            // a real warning beats an invented number.
+            lowFuelWarning == true -> {
+                Text(
+                    "LOW",
+                    color = Color(0xFFD59A3C),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Light
+                )
+                Text("car's own warning", color = labelColor, fontSize = 9.sp)
+            }
+
             else -> {
                 Text("—", color = labelColor, fontSize = 30.sp)
                 Text(
-                    if (canConnected) "CAN silent on fuel" else "CAN not connected",
+                    when {
+                        !canConnected -> "CAN not connected"
+                        // Established rather than assumed: the ZHTD decoder
+                        // declares one fuel field and this car writes zero to
+                        // it, always. Saying so is more use than a dash that
+                        // looks like something still loading.
+                        lowFuelWarning != null -> "level not sent by this car"
+                        else -> "no fuel level"
+                    },
                     color = labelColor,
                     fontSize = 9.sp
                 )

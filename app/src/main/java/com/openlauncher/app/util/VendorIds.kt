@@ -110,7 +110,7 @@ object VendorIds {
      * seventy litre tank reads about 17, which is a plausible percentage and a
      * badly wrong one. It survived only because the value never arrived.
      */
-    fun fuelLitres(raw: Int): Int? = raw.takeIf { it in 0..200 }
+    fun fuelLitres(raw: Int): Int? = raw.takeIf { it in 1..200 }
 
     data class Signal(val id: Int, val name: String, val unit: String)
 }
