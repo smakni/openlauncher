@@ -510,6 +510,13 @@ fun HomeScreen(
                             styleUri   = mapStyleUri,
                             hasMapData = hasMapData,
                             roadSnapMetres = settings.roadSnapMetres,
+                            lastKnown = settings.lastLatitude
+                                .takeIf { it != 0.0 || settings.lastLongitude != 0.0 }
+                                ?.let {
+                                    org.maplibre.android.geometry.LatLng(
+                                        it, settings.lastLongitude
+                                    )
+                                },
                             tiltDegrees = settings.mapTiltDegrees,
                             autoZoomSeconds = settings.mapAutoZoomSeconds,
                             accent    = accent,

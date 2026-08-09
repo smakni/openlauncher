@@ -124,6 +124,11 @@ data class AppSettings(
     // the car is driven — which reads as a broken compass rather than an unknown
     // one.
     val lastBearing: Float = 0f,
+    // Where the vehicle was last seen. Without it the map opens on the whole
+    // planet and stays there until a fix arrives, which on a cold start is
+    // minutes — the launcher looks broken for the entire time.
+    val lastLatitude: Double = 0.0,
+    val lastLongitude: Double = 0.0,
     val showSoundboard: Boolean = false,
     val soundboardPads: List<SoundPadConfig> = defaultSoundboardPads(),
     val vitalsAsBars: Boolean = false,

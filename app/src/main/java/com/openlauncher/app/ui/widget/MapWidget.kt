@@ -128,6 +128,7 @@ fun MapWidget(
     styleUri: String,
     hasMapData: Boolean,
     roadSnapMetres: Int = 0,
+    lastKnown: LatLng? = null,
     tiltDegrees: Int = 0,
     autoZoomSeconds: Int = 0,
     accent: Color,
@@ -310,6 +311,20 @@ fun MapWidget(
 
                     if (map.style == null) {
                         map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
+                        // Placed before any fix exists. The camera was only ever
+                        // touched once a position arrived, so until then the map
+                        // sat at MapLibre's own default — the whole planet — which
+                        // on a cold start is minutes of looking broken.
+                        runCatching {
+                            map.moveCamera(
+                                CameraUpdateFactory.newCameraPosition(
+                                    CameraPosition.Builder()
+                                        .target(lastKnown ?: LatLng(0.0, 0.0))
+                                        .zoom(DEFAULT_ZOOM)
+                                        .build()
+                                )
+                            )
+                        }
                         map.uiSettings.apply {
                             isAttributionEnabled = false
                             isLogoEnabled = false

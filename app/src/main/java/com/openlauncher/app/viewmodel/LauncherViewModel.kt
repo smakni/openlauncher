@@ -43,6 +43,9 @@ import kotlinx.coroutines.flow.*
 /** Smallest heading change worth writing to storage, in degrees. */
 private const val BEARING_SAVE_DELTA = 10f
 
+/** Roughly a hundred metres, past which the remembered position is worth updating. */
+private const val POSITION_SAVE_DEGREES = 0.001
+
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsRepo = SettingsRepository(application)
@@ -780,6 +783,26 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 if (delta >= BEARING_SAVE_DELTA) {
                     saved = current
                     settingsRepo.updateSettings { it.copy(lastBearing = current) }
+                }
+            }
+        }
+
+        // Remembered so the map can open where the car was left. A hundred metres
+        // is far enough to be worth a write and rare enough not to churn the
+        // store at the rate fixes arrive.
+        viewModelScope.launch {
+            var savedLat = 0.0
+            var savedLon = 0.0
+            locationMgr.location.collect { fix ->
+                fix ?: return@collect
+                val moved = kotlin.math.abs(fix.latitude - savedLat) > POSITION_SAVE_DEGREES ||
+                    kotlin.math.abs(fix.longitude - savedLon) > POSITION_SAVE_DEGREES
+                if (moved) {
+                    savedLat = fix.latitude
+                    savedLon = fix.longitude
+                    settingsRepo.updateSettings {
+                        it.copy(lastLatitude = fix.latitude, lastLongitude = fix.longitude)
+                    }
                 }
             }
         }

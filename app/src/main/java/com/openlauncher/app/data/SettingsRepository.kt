@@ -55,6 +55,8 @@ class SettingsRepository(private val context: Context) {
         val SHOW_TRIP_TRACKER     = booleanPreferencesKey("show_trip_tracker")
         val COMPASS_OFFSET        = floatPreferencesKey("compass_offset")
         val LAST_BEARING          = floatPreferencesKey("last_bearing")
+        val LAST_LATITUDE         = doublePreferencesKey("last_latitude")
+        val LAST_LONGITUDE        = doublePreferencesKey("last_longitude")
         val SHOW_SOUNDBOARD       = booleanPreferencesKey("show_soundboard")
         val SOUNDBOARD_PADS_JSON  = stringPreferencesKey("soundboard_pads_json")
         val VITALS_AS_BARS        = booleanPreferencesKey("vitals_as_bars")
@@ -147,6 +149,8 @@ class SettingsRepository(private val context: Context) {
                 showTripTracker  = prefs[Keys.SHOW_TRIP_TRACKER] ?: defaults.showTripTracker,
                 compassOffset    = prefs[Keys.COMPASS_OFFSET]    ?: defaults.compassOffset,
                 lastBearing      = prefs[Keys.LAST_BEARING]      ?: defaults.lastBearing,
+                lastLatitude     = prefs[Keys.LAST_LATITUDE]     ?: defaults.lastLatitude,
+                lastLongitude    = prefs[Keys.LAST_LONGITUDE]    ?: defaults.lastLongitude,
                 showSoundboard   = prefs[Keys.SHOW_SOUNDBOARD]   ?: defaults.showSoundboard,
                 soundboardPads   = prefs[Keys.SOUNDBOARD_PADS_JSON]?.let {
                     runCatching {
@@ -229,6 +233,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.SHOW_TRIP_TRACKER]  = s.showTripTracker
             prefs[Keys.COMPASS_OFFSET]     = s.compassOffset
             prefs[Keys.LAST_BEARING]       = s.lastBearing
+            prefs[Keys.LAST_LATITUDE]      = s.lastLatitude
+            prefs[Keys.LAST_LONGITUDE]     = s.lastLongitude
             prefs[Keys.SHOW_SOUNDBOARD]    = s.showSoundboard
             prefs[Keys.SOUNDBOARD_PADS_JSON] = gson.toJson(s.soundboardPads)
             prefs[Keys.VITALS_AS_BARS]     = s.vitalsAsBars
