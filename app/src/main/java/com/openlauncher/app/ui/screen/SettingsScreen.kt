@@ -1055,6 +1055,33 @@ fun SettingsScreen(
             SettingsDivider()
 
             SettingsRow(
+                label    = "Offline Map Detail",
+                sublabel = when (settings.offlineMapMaxZoom) {
+                    12 -> "Roads only — a region fits easily"
+                    13 -> "Main streets"
+                    14 -> "All streets"
+                    else -> "Street detail — heavy over a large radius"
+                },
+                icon     = Icons.Default.Layers
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(12, 13, 14, 15).forEach { z ->
+                        FilterChip(
+                            selected = settings.offlineMapMaxZoom == z,
+                            onClick  = { onUpdate { copy(offlineMapMaxZoom = z) } },
+                            label    = { Text("z$z", fontSize = 9.sp, letterSpacing = 0.5.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsRow(
                 label    = "Map Perspective",
                 sublabel = if (settings.mapTiltDegrees == 0) "Flat — straight down"
                            else "${settings.mapTiltDegrees}° — buildings raised",
@@ -1136,7 +1163,20 @@ fun SettingsScreen(
                     is com.openlauncher.app.util.DownloadState.Idle ->
                         if (settings.tileUrlTemplate.isBlank())
                             "Set a Tile URL above — tiles are fetched through it"
-                        else "Needs a GPS fix and a connection"
+                        else {
+                            // The count is shown before starting, not after: the
+                            // difference between a town and a region is three
+                            // orders of magnitude, and nobody should discover
+                            // that by waiting.
+                            val tiles = com.openlauncher.app.util.TileDownloader.estimate(
+                                settings.lastLatitude.takeIf { it != 0.0 } ?: 48.0,
+                                settings.offlineMapRadiusKm.toDouble(),
+                                settings.offlineMapMaxZoom
+                            )
+                            val mb = tiles * com.openlauncher.app.util
+                                .TileDownloader.TYPICAL_TILE_BYTES / 1_048_576
+                            "About $tiles tiles, roughly $mb MB"
+                        }
                     is com.openlauncher.app.util.DownloadState.Running ->
                         "${d.percent}% — ${d.megabytes} MB — ${d.completed}/${d.required} tiles"
                     is com.openlauncher.app.util.DownloadState.Done -> "Done — ${d.megabytes} MB stored"

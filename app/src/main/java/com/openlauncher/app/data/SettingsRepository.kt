@@ -73,6 +73,7 @@ class SettingsRepository(private val context: Context) {
         val TILE_URL_TEMPLATE     = stringPreferencesKey("tile_url_template")
         val ROAD_SNAP_METRES      = intPreferencesKey("road_snap_metres")
         val MAP_TILT_DEGREES      = intPreferencesKey("map_tilt_degrees")
+        val OFFLINE_MAP_MAX_ZOOM  = intPreferencesKey("offline_map_max_zoom")
         val MAP_SHOW_PLACES       = booleanPreferencesKey("map_show_places")
         val MAP_AUTO_ZOOM_SECONDS = intPreferencesKey("map_auto_zoom_seconds")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
@@ -171,6 +172,8 @@ class SettingsRepository(private val context: Context) {
                 tileUrlTemplate  = prefs[Keys.TILE_URL_TEMPLATE] ?: defaults.tileUrlTemplate,
                 roadSnapMetres   = prefs[Keys.ROAD_SNAP_METRES] ?: defaults.roadSnapMetres,
                 mapTiltDegrees   = prefs[Keys.MAP_TILT_DEGREES] ?: defaults.mapTiltDegrees,
+                offlineMapMaxZoom = prefs[Keys.OFFLINE_MAP_MAX_ZOOM]
+                    ?: defaults.offlineMapMaxZoom,
                 mapShowPlaces    = prefs[Keys.MAP_SHOW_PLACES] ?: defaults.mapShowPlaces,
                 mapAutoZoomSeconds = prefs[Keys.MAP_AUTO_ZOOM_SECONDS]
                     ?: defaults.mapAutoZoomSeconds,
@@ -251,6 +254,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.TILE_URL_TEMPLATE]   = s.tileUrlTemplate
             prefs[Keys.ROAD_SNAP_METRES]    = s.roadSnapMetres
             prefs[Keys.MAP_TILT_DEGREES]    = s.mapTiltDegrees
+            prefs[Keys.OFFLINE_MAP_MAX_ZOOM] = s.offlineMapMaxZoom
             prefs[Keys.MAP_SHOW_PLACES]     = s.mapShowPlaces
             prefs[Keys.MAP_AUTO_ZOOM_SECONDS] = s.mapAutoZoomSeconds
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle

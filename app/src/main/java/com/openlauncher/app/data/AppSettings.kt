@@ -147,6 +147,10 @@ data class AppSettings(
     // changing when a build is retired — hence a setting rather than a constant.
     val pmtilesUrl: String = "https://build.protomaps.com/20260801.pmtiles",
     val offlineMapRadiusKm: Int = 25,
+    // Deepest zoom fetched when downloading. Street detail over a whole region
+    // is mostly waste — it is wanted where the car is parked, not across two
+    // hundred kilometres — and each level up quadruples the tile count.
+    val offlineMapMaxZoom: Int = 15,
     // A ZXY template, when set, replaces the PMTiles source. It is what makes
     // region download possible at all: the downloader enumerates per-tile URLs,
     // which an archive addressed by byte range does not have.

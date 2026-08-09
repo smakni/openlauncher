@@ -95,7 +95,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             template  = settings.value.tileUrlTemplate,
             centreLat = fix.latitude,
             centreLon = fix.longitude,
-            radiusKm  = settings.value.offlineMapRadiusKm.toDouble()
+            radiusKm  = settings.value.offlineMapRadiusKm.toDouble(),
+            maxZoom   = settings.value.offlineMapMaxZoom
         )
     }
 

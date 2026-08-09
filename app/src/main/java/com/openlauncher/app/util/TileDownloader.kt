@@ -71,7 +71,8 @@ class TileDownloader(private val context: Context) {
         template: String,
         centreLat: Double,
         centreLon: Double,
-        radiusKm: Double
+        radiusKm: Double,
+        maxZoom: Int = MAX_ZOOM
     ) {
         if (template.isBlank()) {
             _state.value = DownloadState.Failed("no tile URL set — see Maps › Tile URL")
@@ -86,7 +87,7 @@ class TileDownloader(private val context: Context) {
             note("template : ${template.replace(Regex("key=[^&]*"), "key=…")}")
             note("centre   : $centreLat, $centreLon")
             note("radius   : $radiusKm km")
-            note("zoom     : $MIN_ZOOM..$MAX_ZOOM")
+            note("zoom     : $MIN_ZOOM..$maxZoom")
 
             val latDelta = radiusKm / KM_PER_DEGREE_LAT
             // Longitude degrees shrink towards the poles, so the east-west span
@@ -96,13 +97,21 @@ class TileDownloader(private val context: Context) {
                 (KM_PER_DEGREE_LAT * cos(Math.toRadians(centreLat)).coerceAtLeast(0.01))
 
             val wanted = mutableListOf<Triple<Int, Int, Int>>()
-            for (z in MIN_ZOOM..MAX_ZOOM) {
+            for (z in MIN_ZOOM..maxZoom) {
                 val xs = lonToX(centreLon - lonDelta, z)..lonToX(centreLon + lonDelta, z)
                 // Y grows southward, so the northern edge gives the lower bound.
                 val ys = latToY(centreLat + latDelta, z)..latToY(centreLat - latDelta, z)
                 for (x in xs) for (y in ys) wanted += Triple(z, x, y)
             }
             note("tiles    : ${wanted.size}")
+
+            if (wanted.size > HARD_TILE_CAP) {
+                note("refused  : above the cap of $HARD_TILE_CAP")
+                _state.value = DownloadState.Failed(
+                    "${wanted.size} tiles is too many — reduce the radius or the detail"
+                )
+                return@launch
+            }
             note("")
 
             val done = AtomicInteger(0)
@@ -213,9 +222,47 @@ class TileDownloader(private val context: Context) {
         return floor(y).toInt().coerceIn(0, n - 1)
     }
 
-    private companion object {
+    companion object {
         const val MIN_ZOOM = 8
         const val MAX_ZOOM = 15
+
+        /**
+         * Where a download stops being a download and becomes an outage.
+         *
+         * A country at street detail runs to hundreds of thousands of tiles:
+         * hours of transfer, and as many billed requests against a metered tile
+         * account. Refusing outright is kinder than letting it run and be
+         * discovered later.
+         */
+        const val HARD_TILE_CAP = 250_000
+
+        /** Vector tiles for this style average a couple of kilobytes. */
+        const val TYPICAL_TILE_BYTES = 2_200L
+
+        /**
+         * How many tiles a box would take, without building the list.
+         *
+         * Shown before starting rather than after: the difference between a town
+         * and a region is three orders of magnitude, and that is not something
+         * anyone should discover by waiting.
+         */
+        fun estimate(centreLat: Double, radiusKm: Double, maxZoom: Int): Int {
+            val latDelta = radiusKm / KM_PER_DEGREE_LAT
+            val lonDelta = radiusKm /
+                (KM_PER_DEGREE_LAT * cos(Math.toRadians(centreLat)).coerceAtLeast(0.01))
+            var total = 0L
+            for (z in MIN_ZOOM..maxZoom) {
+                val n = 1 shl z
+                val across = (2 * lonDelta / 360.0 * n).toLong() + 1
+                // Mercator stretches north-south with latitude, so the row count
+                // is taken from the projected span rather than from degrees.
+                val rad = Math.toRadians(centreLat.coerceIn(-85.0, 85.0))
+                val down = (2 * latDelta / 360.0 * n / cos(rad).coerceAtLeast(0.01)).toLong() + 1
+                total += across * down
+            }
+            return total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        }
+
         const val KM_PER_DEGREE_LAT = 111.32
 
         /** Enough to keep the link busy without the server refusing the burst. */
