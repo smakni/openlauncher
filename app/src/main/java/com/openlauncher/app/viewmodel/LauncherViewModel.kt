@@ -129,7 +129,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 ambientTempC = can.outsideTempC,
                 fuelLevelPct = obd.fuelLevelPct
                     ?: can.fuelRaw?.let { com.openlauncher.app.util.VendorIds.fuelPercent(it) }?.toFloat(),
-                fuelRawCan = can.fuelRaw
+                fuelRawCan = can.fuelRaw,
+                canConnected = can.connected
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, VehicleState())
 

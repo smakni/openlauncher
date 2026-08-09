@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 fun FuelWidget(
     fuelLevelPct: Float?,
     fuelRawCan: Int?,
+    canConnected: Boolean = false,
     accent: Color,
     isDayMode: Boolean = false,
     modifier: Modifier = Modifier
@@ -110,7 +111,11 @@ fun FuelWidget(
 
             else -> {
                 Text("—", color = labelColor, fontSize = 30.sp)
-                Text("no fuel data", color = labelColor, fontSize = 9.sp)
+                Text(
+                    if (canConnected) "CAN silent on fuel" else "CAN not connected",
+                    color = labelColor,
+                    fontSize = 9.sp
+                )
             }
         }
     }

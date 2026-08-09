@@ -68,7 +68,13 @@ class CanVehicleReader(private val context: Context) {
 
     fun start() {
         val intent = Intent(TOOLKIT_ACTION).apply { setPackage(TOOLKIT_PACKAGE) }
-        runCatching { context.bindService(intent, connection, Context.BIND_AUTO_CREATE) }
+        val bound = runCatching {
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        }.getOrDefault(false)
+        // Recorded rather than dropped. A failed bind and a silent car produce
+        // the same empty screen, and telling them apart is the difference
+        // between a wiring bug and a car that does not send the signal.
+        if (!bound) _vehicle.value = _vehicle.value.copy(connected = false)
     }
 
     fun stop() {
@@ -128,7 +134,11 @@ class CanVehicleReader(private val context: Context) {
 
     private companion object {
         const val TOOLKIT_PACKAGE = "com.syu.ms"
-        const val TOOLKIT_ACTION = "com.syu.ms.ToolkitService"
+        // The action, not the component name. Binding against
+        // "com.syu.ms.ToolkitService" fails and fails quietly: bindService
+        // returns without connecting, no callback is ever registered, and every
+        // reading stays null exactly as it would on a car that says nothing.
+        const val TOOLKIT_ACTION = "com.syu.ms.toolkit"
 
         const val ID_DIPPED = 98
         const val ID_MAIN_BEAM = 99

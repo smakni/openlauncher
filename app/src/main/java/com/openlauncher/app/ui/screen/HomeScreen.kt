@@ -535,12 +535,14 @@ fun HomeScreen(
                         "FUEL" -> FuelWidget(
                             fuelLevelPct = vehicle.fuelLevelPct,
                             fuelRawCan   = vehicle.fuelRawCan,
+                            canConnected = vehicle.canConnected,
                             accent       = accent,
                             isDayMode    = isDayMode,
                             modifier     = Modifier.fillMaxSize()
                         )
                         "TEMPERATURE" -> TemperatureWidget(
                             ambientTempC = vehicle.ambientTempC,
+                            canConnected = vehicle.canConnected,
                             accent       = accent,
                             metric       = settings.unitSystem.name == "METRIC",
                             isDayMode    = isDayMode,

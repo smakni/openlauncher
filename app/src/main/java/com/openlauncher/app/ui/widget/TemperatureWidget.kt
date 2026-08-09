@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun TemperatureWidget(
     ambientTempC: Double?,
+    canConnected: Boolean = false,
     accent: Color,
     metric: Boolean = true,
     isDayMode: Boolean = false,
@@ -61,7 +62,7 @@ fun TemperatureWidget(
                 textAlign = TextAlign.Center
             )
             Text(
-                "no CAN data",
+                if (canConnected) "CAN silent" else "CAN not connected",
                 color = labelColor,
                 fontSize = 9.sp
             )

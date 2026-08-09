@@ -36,6 +36,14 @@ data class VehicleState(
      * against the dashboard gauge. It goes once the scale is known.
      */
     val fuelRawCan: Int? = null,
+    /**
+     * Whether the CAN decoder service is bound.
+     *
+     * Shown by the widgets that depend on it, because "not connected" and
+     * "connected and saying nothing" look identical on screen and have entirely
+     * different causes — one is a bug here, the other is the car.
+     */
+    val canConnected: Boolean = false,
     val batteryVolts: Float? = null,
     /** Instantaneous consumption derived from MAF — see ObdManager.consumptionFrom. */
     val consumptionLph: Float? = null
