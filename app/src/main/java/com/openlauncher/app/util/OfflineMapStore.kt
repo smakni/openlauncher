@@ -138,7 +138,12 @@ object OfflineMapStore {
             archive != null -> """"url": "pmtiles://file://${archive.absolutePath}""""
             else            -> """"url": "pmtiles://$remotePmTilesUrl""""
         }
-        val styleFile = File(baseDir(context), "style.json")
+        // Named for the palette it holds, and that matters beyond tidiness.
+        // The widget re-applies a style when the URI changes and one file for
+        // both modes meant the URI never did: switching between day and night
+        // rewrote the file under a name the renderer had already loaded, so the
+        // map kept the palette it started with until the launcher was restarted.
+        val styleFile = File(baseDir(context), if (dayMode) "style-day.json" else "style-night.json")
         val json = context.assets.open("map-style.json").bufferedReader().use { it.readText() }
             .replace("\"url\": \"__PMTILES_URL__\"", sourceJson)
 
@@ -213,7 +218,7 @@ object OfflineMapStore {
            "text-field": ["get", "name"],
            "text-padding": 6,
            "text-font": ["Noto Sans Regular"],
-           "text-size": 10,
+           "text-size": ["interpolate", ["linear"], ["zoom"], 16, 12, 18, 15, 20, 18],
            "text-anchor": "top",
            "text-offset": [0, 0.6],
            "text-max-width": 8
@@ -221,7 +226,7 @@ object OfflineMapStore {
          "paint": {
            "text-color": "#a8b2c0",
            "text-halo-color": "#12151a",
-           "text-halo-width": 1.2
+           "text-halo-width": 1.8
          }}
     """
 
