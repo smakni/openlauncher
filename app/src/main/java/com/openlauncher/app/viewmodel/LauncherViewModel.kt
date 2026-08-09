@@ -104,8 +104,32 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     fun cancelMapDownload() = mapDownloader.cancel()
 
-    // ── OBD-II ────────────────────────────────────────────────────────────────
-    val vehicle:   StateFlow<VehicleState> = obdMgr.vehicle
+    // ── Vehicle data ──────────────────────────────────────────────────────────
+
+    /** The CAN decoder, which reports without any adapter being fitted. */
+    private val canReader = com.openlauncher.app.util.CanVehicleReader(getApplication())
+
+    val canVehicle = canReader.vehicle
+
+    /**
+     * Engine data from whichever source has it.
+     *
+     * The dongle wins where it answers, because it reads the ECU directly and
+     * carries readings the decoder has no id for at all — coolant, boost, load.
+     * But it needs an adapter, a pairing and a live socket, and the decoder
+     * needs none of those, so it fills in underneath rather than being a
+     * fallback of last resort. On a car with no dongle fitted it is the only
+     * source, and it is a real one: the engine speed it reports was watched
+     * drifting around a diesel idle while parked.
+     */
+    val vehicle: StateFlow<VehicleState> =
+        kotlinx.coroutines.flow.combine(obdMgr.vehicle, canReader.vehicle) { obd, can ->
+            obd.copy(
+                rpm = obd.rpm ?: can.engineRpm,
+                speedKph = obd.speedKph ?: can.speedKph
+            )
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, VehicleState())
+
     val obdStatus: StateFlow<ObdStatus>    = obdMgr.status
 
     /**
@@ -762,6 +786,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        runCatching { canReader.stop() }
         super.onCleared()
         locationMgr.stop()
         obdMgr.stop()
@@ -770,6 +795,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     init {
+        // Bound for the life of the view model. The decoder reports whether or
+        // not a dongle is fitted, so there is nothing to wait for and no setting
+        // to gate it behind.
+        runCatching { canReader.start() }
+
         loadInstalledApps()
         refreshConnectivity()
         if (hasSzchoicewayMcu) startHardwareRadioObserver()
