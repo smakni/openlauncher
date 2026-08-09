@@ -96,6 +96,28 @@ object CanbusDbDumper {
                 }
                 append("tables: ${tables.joinToString(", ")}\n")
 
+                // Asked for first and without a limit. The row cap keeps the file
+                // readable, and it truncated the largest table at four hundred of
+                // its five thousand rows — with every entry for this unit's
+                // decoder sitting past that. The dump answered every question
+                // except the one it was run to answer.
+                if (tables.contains("canbus_canbox")) {
+                    append("\n[LAND ROVER — every protocol, no limit]\n")
+                    runCatching {
+                        it.rawQuery(LANDROVER_QUERY, null).use { c ->
+                            append(c.columnNames.joinToString(" | ")).append('\n')
+                            var rows = 0
+                            while (c.moveToNext()) {
+                                rows++
+                                append((0 until c.columnCount).joinToString(" | ") { i ->
+                                    runCatching { c.getString(i) }.getOrNull() ?: "?"
+                                }).append('\n')
+                            }
+                            if (rows == 0) append("  none in this database\n")
+                        }
+                    }.onFailure { e -> append("  unreadable: ${e.javaClass.simpleName}\n") }
+                }
+
                 for (table in tables) {
                     append("\n[$table]\n")
                     runCatching {
