@@ -102,20 +102,11 @@ object CanbusDbDumper {
                 // decoder sitting past that. The dump answered every question
                 // except the one it was run to answer.
                 if (tables.contains("canbus_canbox")) {
-                    append("\n[LAND ROVER — every protocol, no limit]\n")
-                    runCatching {
-                        it.rawQuery(LANDROVER_QUERY, null).use { c ->
-                            append(c.columnNames.joinToString(" | ")).append('\n')
-                            var rows = 0
-                            while (c.moveToNext()) {
-                                rows++
-                                append((0 until c.columnCount).joinToString(" | ") { i ->
-                                    runCatching { c.getString(i) }.getOrNull() ?: "?"
-                                }).append('\n')
-                            }
-                            if (rows == 0) append("  none in this database\n")
-                        }
-                    }.onFailure { e -> append("  unreadable: ${e.javaClass.simpleName}\n") }
+                    // Two queries, each guarded on its own. The first needs no
+                    // joins at all, so a wrong column name elsewhere cannot cost
+                    // it — which is exactly what happened to its predecessor.
+                    emitQuery(this, it, "ZHTD — this unit's decoder, every row", ZHTD_QUERY)
+                    emitQuery(this, it, "LAND ROVER — every maker", LANDROVER_QUERY)
                 }
 
                 for (table in tables) {
@@ -136,6 +127,51 @@ object CanbusDbDumper {
     }.getOrElse { "cannot open as SQLite: ${it.javaClass.simpleName}\n" }
 
     /**
+     * Runs one query and writes its rows, or why it could not.
+     *
+     * The reason is written in full. Reporting only the exception type turned
+     * "no such column" into "SQLiteException", which named the failure without
+     * saying anything about it and cost a round trip to rediscover.
+     */
+    private fun emitQuery(
+        out: StringBuilder,
+        db: SQLiteDatabase,
+        title: String,
+        sql: String
+    ) {
+        out.append("\n[").append(title).append("]\n")
+        runCatching {
+            db.rawQuery(sql, null).use { c ->
+                out.append(c.columnNames.joinToString(" | ")).append('\n')
+                var rows = 0
+                while (c.moveToNext()) {
+                    rows++
+                    out.append((0 until c.columnCount).joinToString(" | ") { i ->
+                        runCatching { c.getString(i) }.getOrNull() ?: "?"
+                    }).append('\n')
+                }
+                if (rows == 0) out.append("  none in this database\n")
+            }
+        }.onFailure { e ->
+            out.append("  unreadable: ${e.javaClass.simpleName}: ${e.message}\n")
+        }
+    }
+
+    /**
+     * Every protocol belonging to this unit's decoder.
+     *
+     * Deliberately join-free: the ids alone are enough to find the rows, and
+     * nothing here can break on a column named differently from its neighbours.
+     */
+    private const val ZHTD_QUERY = """
+        SELECT id, canbus_canbox_en, id_value, disp, name,
+               company_id, carset_id, cartype_id
+        FROM canbus_canbox
+        WHERE company_id = 35
+        ORDER BY carset_id, cartype_id, id_value
+    """
+
+    /**
      * Every Land Rover protocol, joined to the names that make it legible.
      *
      * The English columns are used because the Chinese ones arrive mis-encoded
@@ -144,17 +180,17 @@ object CanbusDbDumper {
      */
     private const val LANDROVER_QUERY = """
         SELECT b.id_value, b.canbus_canbox_en AS variant,
-               co.canbus_company_en AS maker,
+               co.canbus_company_name_en AS maker,
                t.canbus_cartype_en AS model,
                b.name AS note
         FROM canbus_canbox b
         LEFT JOIN canbus_company co ON co.id = b.company_id
         LEFT JOIN canbus_cartype t  ON t.id  = b.cartype_id
         LEFT JOIN canbus_carset  cs ON cs.id = b.carset_id
-        WHERE cs.canbus_carset_en LIKE '%androver%'
+        WHERE cs.canbus_carset_name_en LIKE '%androver%'
            OR t.canbus_cartype_en LIKE '%androver%'
            OR t.canbus_cartype_en LIKE '%reelander%'
-           OR t.canbus_cartype_en LIKE '%ange%'
+           OR t.canbus_cartype_en = 'Range'
         ORDER BY b.id_value
     """
 
