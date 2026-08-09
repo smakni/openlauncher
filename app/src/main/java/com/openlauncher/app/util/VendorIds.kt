@@ -99,5 +99,16 @@ object VendorIds {
      */
     fun outsideTempC(raw: Int): Double = raw / 2.0 - 40.0
 
+    /**
+     * Fuel remaining as a percentage, or null when the raw value cannot be one.
+     *
+     * The decoder declares the id; what scale it sends is not established. A
+     * percentage is the common case and is assumed here, but only where the
+     * number could actually be one — a value above 100 proves the scale is
+     * something else (a byte fraction, litres, bar count), and returning null
+     * there makes that visible instead of drawing a gauge that is quietly wrong.
+     */
+    fun fuelPercent(raw: Int): Int? = raw.takeIf { it in 0..100 }
+
     data class Signal(val id: Int, val name: String, val unit: String)
 }

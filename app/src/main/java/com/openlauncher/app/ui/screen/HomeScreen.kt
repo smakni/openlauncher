@@ -62,12 +62,13 @@ private val ALL_WIDGET_TYPES = listOf(
     WidgetTypeInfo("NOW_PLAYING", "NOW PLAYING", Icons.Default.MusicNote,   "Media controls"),
     WidgetTypeInfo("TELEMETRY",   "COMPASS",     Icons.Default.Explore,     "Speed & heading"),
     WidgetTypeInfo("ALTIMETER",   "ALTIMETER",   Icons.Default.FlightTakeoff, "Roll, pitch & altitude"),
-    WidgetTypeInfo("SPEEDOMETER", "SPEED",       Icons.Default.Speed,         "GPS speed"),
+    WidgetTypeInfo("SPEEDOMETER", "SPEED",       Icons.Default.Speed,         "Speed, with an optional rev counter"),
     WidgetTypeInfo("VITALS",      "VITALS",      Icons.Default.Dns,           "Head Unit Health / Vitals"),
     WidgetTypeInfo("TRIP_TRACKER", "TRIP TRACKER", Icons.Default.Map,          "Trip logs & stats"),
     WidgetTypeInfo("SOUNDBOARD",  "SOUNDBOARD",  Icons.Default.Piano,         "Custom sound pads"),
     WidgetTypeInfo("VEHICLE",     "VEHICLE",     Icons.Default.DirectionsCar, "Live engine data (OBD-II)"),
     WidgetTypeInfo("TEMPERATURE", "OUTSIDE",     Icons.Default.Thermostat,    "Outside temperature, from CAN"),
+    WidgetTypeInfo("FUEL",        "FUEL",        Icons.Default.LocalGasStation, "Fuel remaining"),
     WidgetTypeInfo("MAP",         "MAP",         Icons.Default.Map,           "Position on an OpenStreetMap view")
 )
 
@@ -84,6 +85,7 @@ private fun canAddWidget(settings: com.openlauncher.app.data.AppSettings): Boole
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
         if (settings.showTemperature) add("TEMPERATURE")
+        if (settings.showFuel) add("FUEL")
         if (settings.showMap) add("MAP")
     }
     val activeWidgets = settings.widgetLayout.filter { it.enabled && it.id in visibleIds }
@@ -130,6 +132,7 @@ fun HomeScreen(
     onSetClockStyle: (ClockStyle) -> Unit,
     onSetVitalsAsBars: (Boolean) -> Unit = {},
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit = {},
+    onSetSpeedometerShowTacho: (Boolean) -> Unit = {},
     onUpdateSoundPad: (index: Int, pad: com.openlauncher.app.data.SoundPadConfig) -> Unit = { _, _ -> },
     hardwareRadio: com.openlauncher.app.viewmodel.LauncherViewModel.HardwareRadioState? = null,
     onLaunchHardwareRadio: () -> Unit = {},
@@ -260,6 +263,8 @@ fun HomeScreen(
                 if (settings.showSoundboard) add("SOUNDBOARD")
                 if (settings.showVehicle) add("VEHICLE")
                 if (settings.showTemperature) add("TEMPERATURE")
+                if (settings.showFuel) add("FUEL")
+        if (settings.showFuel) add("FUEL")
                 if (settings.showMap) add("MAP")
             }
 
@@ -341,6 +346,7 @@ fun HomeScreen(
                     // The widget draws its own OUTSIDE caption above the reading,
                     // so a corner label here would only repeat it.
                     "TEMPERATURE" -> ""
+                    "FUEL"        -> ""
                     else          -> w.id
                 }
 
@@ -474,6 +480,9 @@ fun HomeScreen(
                             accent    = accent,
                             isDayMode = isDayMode,
                             digitalOnly = settings.speedometerDigitalOnly,
+                            canSpeedKph = vehicle.speedKph,
+                            rpm         = vehicle.rpm,
+                            showTacho   = settings.speedometerShowTacho,
                             modifier  = Modifier.fillMaxSize()
                         )
                         "VITALS" -> VitalsWidget(
@@ -523,6 +532,13 @@ fun HomeScreen(
                             isDayMode = isDayMode,
                             modifier  = Modifier.fillMaxSize()
                         )
+                        "FUEL" -> FuelWidget(
+                            fuelLevelPct = vehicle.fuelLevelPct,
+                            fuelRawCan   = vehicle.fuelRawCan,
+                            accent       = accent,
+                            isDayMode    = isDayMode,
+                            modifier     = Modifier.fillMaxSize()
+                        )
                         "TEMPERATURE" -> TemperatureWidget(
                             ambientTempC = vehicle.ambientTempC,
                             accent       = accent,
@@ -562,6 +578,7 @@ fun HomeScreen(
             clockStyle          = settings.clockStyle,
             vitalsAsBars        = settings.vitalsAsBars,
             speedometerDigitalOnly = settings.speedometerDigitalOnly,
+            speedometerShowTacho = settings.speedometerShowTacho,
             carPlayPackage      = settings.carPlayPackage,
             androidAutoPackage  = settings.androidAutoPackage,
             pipAppPackage       = settings.pipAppPackage,
@@ -576,6 +593,7 @@ fun HomeScreen(
             onSetClockStyle     = { onSetClockStyle(it) },
             onSetVitalsAsBars   = { onSetVitalsAsBars(it) },
             onSetSpeedometerDigitalOnly = { onSetSpeedometerDigitalOnly(it) },
+            onSetSpeedometerShowTacho = { onSetSpeedometerShowTacho(it) },
             onDismiss           = { contextMenuId = null }
         )
     }
@@ -617,6 +635,7 @@ private fun WidgetContextMenu(
     clockStyle: ClockStyle,
     vitalsAsBars: Boolean,
     speedometerDigitalOnly: Boolean,
+    speedometerShowTacho: Boolean,
     carPlayPackage: String = "",
     androidAutoPackage: String = "",
     pipAppPackage: String = "",
@@ -631,6 +650,7 @@ private fun WidgetContextMenu(
     onSetClockStyle: (ClockStyle) -> Unit,
     onSetVitalsAsBars: (Boolean) -> Unit,
     onSetSpeedometerDigitalOnly: (Boolean) -> Unit,
+    onSetSpeedometerShowTacho: (Boolean) -> Unit,
     onDismiss: () -> Unit
 ) {
     val menuBg    = if (isDayMode) Color(0xFFFFFFFF) else Color(0xFF111111)
@@ -698,6 +718,14 @@ private fun WidgetContextMenu(
                     icon    = Icons.Default.Dialpad,
                     tint    = if (speedometerDigitalOnly) accent else inactiveMenuTint,
                     onClick = { onSetSpeedometerDigitalOnly(true); onDismiss() },
+                    isDayMode = isDayMode
+                )
+                HorizontalDivider(color = menuDivider)
+                ContextRow(
+                    label   = if (speedometerShowTacho) "REV COUNTER ON" else "REV COUNTER OFF",
+                    icon    = Icons.Default.Adjust,
+                    tint    = if (speedometerShowTacho) accent else inactiveMenuTint,
+                    onClick = { onSetSpeedometerShowTacho(!speedometerShowTacho); onDismiss() },
                     isDayMode = isDayMode
                 )
             }
@@ -897,6 +925,7 @@ private fun WidgetLibraryDialog(
         if (settings.showSoundboard) add("SOUNDBOARD")
         if (settings.showVehicle) add("VEHICLE")
         if (settings.showTemperature) add("TEMPERATURE")
+        if (settings.showFuel) add("FUEL")
         if (settings.showMap) add("MAP")
     }
     val canAdd = canAddWidget(settings)

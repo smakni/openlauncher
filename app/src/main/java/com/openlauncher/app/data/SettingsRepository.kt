@@ -76,6 +76,8 @@ class SettingsRepository(private val context: Context) {
         val MAP_SHOW_PLACES       = booleanPreferencesKey("map_show_places")
         val SHOW_VEHICLE          = booleanPreferencesKey("show_vehicle")
         val SHOW_TEMPERATURE      = booleanPreferencesKey("show_temperature")
+        val SHOW_FUEL             = booleanPreferencesKey("show_fuel")
+        val SPEEDOMETER_SHOW_TACHO = booleanPreferencesKey("speedometer_show_tacho")
     }
 
     val settingsFlow: Flow<AppSettings> = context.dataStore.data
@@ -171,7 +173,10 @@ class SettingsRepository(private val context: Context) {
                     ?: defaults.offlineMapMaxZoom,
                 mapShowPlaces    = prefs[Keys.MAP_SHOW_PLACES] ?: defaults.mapShowPlaces,
                 showVehicle      = prefs[Keys.SHOW_VEHICLE] ?: defaults.showVehicle,
-                showTemperature  = prefs[Keys.SHOW_TEMPERATURE] ?: defaults.showTemperature
+                showTemperature  = prefs[Keys.SHOW_TEMPERATURE] ?: defaults.showTemperature,
+                showFuel         = prefs[Keys.SHOW_FUEL] ?: defaults.showFuel,
+                speedometerShowTacho = prefs[Keys.SPEEDOMETER_SHOW_TACHO]
+                    ?: defaults.speedometerShowTacho
             )
     }
 
@@ -244,6 +249,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.MAP_SHOW_PLACES]     = s.mapShowPlaces
             prefs[Keys.SHOW_VEHICLE]        = s.showVehicle
             prefs[Keys.SHOW_TEMPERATURE]    = s.showTemperature
+            prefs[Keys.SHOW_FUEL]           = s.showFuel
+            prefs[Keys.SPEEDOMETER_SHOW_TACHO] = s.speedometerShowTacho
     }
 
     suspend fun resetToDefaults() {

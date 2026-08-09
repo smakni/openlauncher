@@ -34,6 +34,8 @@ class CanVehicleReader(private val context: Context) {
         /** Raw gear code. Meaning per car; not decoded until confirmed. */
         val gearRaw: Int? = null,
         val outsideTempC: Double? = null,
+        /** Fuel remaining, as the decoder sends it. Scale unconfirmed. */
+        val fuelRaw: Int? = null,
         val handbrake: Boolean? = null,
         val dippedBeam: Boolean? = null,
         val mainBeam: Boolean? = null,
@@ -114,6 +116,7 @@ class CanVehicleReader(private val context: Context) {
             ID_SPEED -> current.copy(speedKph = value)
             ID_GEAR -> current.copy(gearRaw = value)
             ID_OUTSIDE_TEMP -> current.copy(outsideTempC = VendorIds.outsideTempC(value))
+            ID_FUEL -> current.copy(fuelRaw = value)
             ID_HANDBRAKE -> current.copy(handbrake = value != 0)
             ID_DIPPED -> current.copy(dippedBeam = value != 0)
             ID_MAIN_BEAM -> current.copy(mainBeam = value != 0)
@@ -136,10 +139,11 @@ class CanVehicleReader(private val context: Context) {
         const val ID_ENGINE = 107
         const val ID_GEAR = 131
         const val ID_OUTSIDE_TEMP = 123
+        const val ID_FUEL = 106
 
         val WATCHED = listOf(
             ID_DIPPED, ID_MAIN_BEAM, ID_INDICATOR_L, ID_INDICATOR_R,
-            ID_HANDBRAKE, ID_SPEED, ID_ENGINE, ID_GEAR, ID_OUTSIDE_TEMP
+            ID_HANDBRAKE, ID_SPEED, ID_ENGINE, ID_GEAR, ID_OUTSIDE_TEMP, ID_FUEL
         )
     }
 }

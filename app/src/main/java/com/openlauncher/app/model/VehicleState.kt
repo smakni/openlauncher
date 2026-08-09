@@ -28,6 +28,14 @@ data class VehicleState(
     /** Gauge pressure: manifold absolute minus barometric. Negative under vacuum. */
     val boostBar: Float? = null,
     val fuelLevelPct: Float? = null,
+    /**
+     * Fuel as the CAN decoder sends it, before any scale is assumed.
+     *
+     * Kept alongside the percentage rather than folded into it: the scale is not
+     * yet confirmed, and a raw number on screen is what lets it be checked
+     * against the dashboard gauge. It goes once the scale is known.
+     */
+    val fuelRawCan: Int? = null,
     val batteryVolts: Float? = null,
     /** Instantaneous consumption derived from MAF — see ObdManager.consumptionFrom. */
     val consumptionLph: Float? = null

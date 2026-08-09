@@ -254,6 +254,7 @@ class MainActivity : ComponentActivity() {
                                         onSetClockStyle     = { style -> vm.updateSettings { copy(clockStyle = style) } },
                                         onSetVitalsAsBars   = { asBars -> vm.updateSettings { copy(vitalsAsBars = asBars) } },
                                         onSetSpeedometerDigitalOnly = { digital -> vm.updateSettings { copy(speedometerDigitalOnly = digital) } },
+                                        onSetSpeedometerShowTacho = { show -> vm.updateSettings { copy(speedometerShowTacho = show) } },
                                         onUpdateSoundPad    = { idx, pad -> vm.updateSoundboardPad(idx, pad) },
                                         hardwareRadio         = hardwareRadio,
                                         onLaunchHardwareRadio = { vm.launchHardwareRadioApp() },

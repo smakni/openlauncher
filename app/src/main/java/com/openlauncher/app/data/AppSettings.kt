@@ -119,6 +119,10 @@ data class AppSettings(
     val soundboardPads: List<SoundPadConfig> = defaultSoundboardPads(),
     val vitalsAsBars: Boolean = false,
     val speedometerDigitalOnly: Boolean = false,
+    // The rev counter shares the speed widget rather than taking a cell of its
+    // own: both answer "how hard is the car working", and split across two
+    // widgets they have to be read together anyway.
+    val speedometerShowTacho: Boolean = false,
     val gradientDirection: GradientDirection = GradientDirection.DIAGONAL,
     val useCustomBackgroundColor: Boolean = false,
     // OBD-II adapter. The MAC identifies the dongle; the name is kept alongside it
@@ -149,7 +153,8 @@ data class AppSettings(
     // they are clutter, and the road labels are what actually help.
     val mapShowPlaces: Boolean = false,
     val showVehicle: Boolean = false,
-    val showTemperature: Boolean = false
+    val showTemperature: Boolean = false,
+    val showFuel: Boolean = false
 )
 
 fun defaultShortcuts() = listOf(
@@ -186,6 +191,7 @@ fun AppSettings.activeWidgetIds(): Set<String> = buildSet {
     if (showSoundboard) add("SOUNDBOARD")
     if (showVehicle) add("VEHICLE")
     if (showTemperature) add("TEMPERATURE")
+    if (showFuel) add("FUEL")
     if (showMap) add("MAP")
 }
 

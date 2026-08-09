@@ -126,7 +126,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             obd.copy(
                 rpm = obd.rpm ?: can.engineRpm,
                 speedKph = obd.speedKph ?: can.speedKph,
-                ambientTempC = can.outsideTempC
+                ambientTempC = can.outsideTempC,
+                fuelLevelPct = obd.fuelLevelPct
+                    ?: can.fuelRaw?.let { com.openlauncher.app.util.VendorIds.fuelPercent(it) }?.toFloat(),
+                fuelRawCan = can.fuelRaw
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, VehicleState())
 
@@ -323,6 +326,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "SOUNDBOARD"  -> copy(showSoundboard = true)
                 "VEHICLE"     -> copy(showVehicle = true)
                 "TEMPERATURE" -> copy(showTemperature = true)
+                "FUEL"        -> copy(showFuel = true)
                 "MAP"         -> copy(showMap = true)
                 else          -> this
             }
@@ -357,6 +361,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 "SOUNDBOARD"  -> copy(showSoundboard = false)
                 "VEHICLE"     -> copy(showVehicle = false)
                 "TEMPERATURE" -> copy(showTemperature = false)
+                "FUEL"        -> copy(showFuel = false)
                 "MAP"         -> copy(showMap = false)
                 else          -> this
             }
