@@ -8,6 +8,13 @@ import android.os.IBinder
 import com.syu.ipc.IModuleCallback
 import com.syu.ipc.IRemoteModule
 import com.syu.ipc.IRemoteToolkit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -52,7 +59,15 @@ class CanVehicleReader(private val context: Context) {
     private var module: IRemoteModule? = null
     // Kept with the id they were registered under: unregistering needs both,
     // and a callback released against the wrong id leaves the real one live.
+    //
+    // Guarded by its own monitor: the refresh runs on a background thread while
+    // stop() runs on the main one, and iterating this while the other mutates it
+    // throws. With no ADB on this unit that crash would surface as the launcher
+    // vanishing, with nothing to read afterwards.
     private val callbacks = mutableListOf<Pair<Int, IModuleCallback>>()
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var refreshJob: Job? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -79,13 +94,17 @@ class CanVehicleReader(private val context: Context) {
     }
 
     fun stop() {
+        refreshJob?.cancel()
+        refreshJob = null
         runCatching {
             val remote = module
-            if (remote != null) callbacks.forEach { (id, callback) ->
-                runCatching { remote.unregister(callback, id) }
+            synchronized(callbacks) {
+                if (remote != null) callbacks.forEach { (id, callback) ->
+                    runCatching { remote.unregister(callback, id) }
+                }
+                callbacks.clear()
             }
         }
-        callbacks.clear()
         runCatching { context.unbindService(connection) }
         toolkit = null
         module = null
@@ -98,20 +117,74 @@ class CanVehicleReader(private val context: Context) {
         module = remote
         _vehicle.update { it.copy(connected = true) }
 
-        WATCHED.forEach { id ->
-            val callback = object : IModuleCallback.Stub() {
-                override fun update(
-                    updateId: Int,
-                    ints: IntArray?,
-                    floats: FloatArray?,
-                    strings: Array<String>?
-                ) {
-                    val value = ints?.firstOrNull() ?: return
-                    apply(updateId, value)
+        WATCHED.forEach { id -> subscribeId(remote, id) }
+        startRefresh()
+    }
+
+    private fun subscribeId(remote: IRemoteModule, id: Int) {
+        val callback = object : IModuleCallback.Stub() {
+            override fun update(
+                updateId: Int,
+                ints: IntArray?,
+                floats: FloatArray?,
+                strings: Array<String>?
+            ) {
+                val value = ints?.firstOrNull() ?: return
+                apply(updateId, value)
+            }
+        }
+        runCatching { remote.register(callback, id, 0) }
+            .onSuccess { synchronized(callbacks) { callbacks += id to callback } }
+    }
+
+    /**
+     * Re-subscribes the ids that have never produced a value.
+     *
+     * The service appears to push only on change. Engine speed therefore arrives
+     * constantly while outside temperature and fuel — which are sent once and
+     * then sit still for hours — are never seen at all: the launcher starts
+     * after they were last sent and waits for a change that does not come.
+     *
+     * Re-registering is the way to ask again without sending the decoder a
+     * command. It is subscription traffic and nothing else, so it cannot alter
+     * how the CAN box is configured — which matters, because a wrong command to
+     * this MCU costs the steering wheel controls or the camera.
+     *
+     * Only ids still missing are retried, so this stops by itself once the car
+     * has answered rather than churning subscriptions for the rest of the drive.
+     */
+    private fun startRefresh() {
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            repeat(REFRESH_ATTEMPTS) {
+                delay(REFRESH_INTERVAL_MS)
+                val remote = module ?: return@launch
+                val missing = missingIds()
+                if (missing.isEmpty()) return@launch
+                missing.forEach { id ->
+                    // Released first: registering twice for the same id would
+                    // leave a callback behind that nothing ever unregisters.
+                    val held = synchronized(callbacks) {
+                        callbacks.filter { it.first == id }
+                            .also { callbacks.removeAll { c -> c.first == id } }
+                    }
+                    held.forEach { (heldId, cb) ->
+                        runCatching { remote.unregister(cb, heldId) }
+                    }
+                    subscribeId(remote, id)
                 }
             }
-            runCatching { remote.register(callback, id, 0) }
-                .onSuccess { callbacks += id to callback }
+        }
+    }
+
+    private fun missingIds(): List<Int> {
+        val v = _vehicle.value
+        return buildList {
+            if (v.outsideTempC == null) add(ID_OUTSIDE_TEMP)
+            if (v.fuelRaw == null) add(ID_FUEL)
+            if (v.gearRaw == null) add(ID_GEAR)
+            if (v.speedKph == null) add(ID_SPEED)
+            if (v.engineRpm == null) add(ID_ENGINE)
         }
     }
 
@@ -166,6 +239,11 @@ class CanVehicleReader(private val context: Context) {
         const val ID_GEAR = 131
         const val ID_OUTSIDE_TEMP = 123
         const val ID_FUEL = 106
+
+        /** Long enough that a car which answers normally never retries. */
+        const val REFRESH_INTERVAL_MS = 4_000L
+        /** Stops after roughly a minute; past that the car is not going to answer. */
+        const val REFRESH_ATTEMPTS = 15
 
         val WATCHED = listOf(
             ID_DIPPED, ID_MAIN_BEAM, ID_INDICATOR_L, ID_INDICATOR_R,
