@@ -44,6 +44,14 @@ data class VehicleState(
      * different causes — one is a bug here, the other is the car.
      */
     val canConnected: Boolean = false,
+    /**
+     * Whether the car reports an outside temperature at all.
+     *
+     * Null until the decoder has been asked. False is a permanent answer and
+     * deserves different wording on screen from a reading that has simply not
+     * arrived yet.
+     */
+    val tempSensorPresent: Boolean? = null,
     val batteryVolts: Float? = null,
     /** Instantaneous consumption derived from MAF — see ObdManager.consumptionFrom. */
     val consumptionLph: Float? = null

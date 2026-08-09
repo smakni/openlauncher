@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 fun TemperatureWidget(
     ambientTempC: Double?,
     canConnected: Boolean = false,
+    tempSensorPresent: Boolean? = null,
     accent: Color,
     metric: Boolean = true,
     isDayMode: Boolean = false,
@@ -62,7 +63,11 @@ fun TemperatureWidget(
                 textAlign = TextAlign.Center
             )
             Text(
-                if (canConnected) "CAN silent" else "CAN not connected",
+                when {
+                    tempSensorPresent == false -> "no sensor on this car"
+                    canConnected -> "CAN silent"
+                    else -> "CAN not connected"
+                },
                 color = labelColor,
                 fontSize = 9.sp
             )

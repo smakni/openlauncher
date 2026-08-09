@@ -49,7 +49,9 @@ class CanVehicleReader(private val context: Context) {
         val mainBeam: Boolean? = null,
         val indicatorLeft: Boolean? = null,
         val indicatorRight: Boolean? = null,
-        val connected: Boolean = false
+        val connected: Boolean = false,
+        /** Whether the car has an outside temperature sensor; null until asked. */
+        val tempSensorPresent: Boolean? = null
     )
 
     private val _vehicle = MutableStateFlow(CanVehicle())
@@ -69,10 +71,8 @@ class CanVehicleReader(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var refreshJob: Job? = null
 
-    // Whether the reply layout of get() has been checked against a value known
-    // from the callback. Until it has, get() is called only to prove itself and
-    // never to fill a reading.
-    @Volatile private var layoutProven = false
+    // Written once if the service answers nothing at all, so a silent failure
+    // leaves evidence rather than another guess.
     @Volatile private var rawDumped = false
 
     private val connection = object : ServiceConnection {
@@ -135,6 +135,12 @@ class CanVehicleReader(private val context: Context) {
         // about fall through the when in apply() and cost nothing beyond a
         // binder call that was already being made for the sweep.
         (0 until ID_COUNT).forEach { id -> subscribeId(remote, id) }
+
+        // Asked for outright rather than waited for. The subscription only
+        // fires on change, so a value that has held steady since before the
+        // launcher started would otherwise never arrive at all.
+        fetch(remote, missingIds())
+        readSensorPresence(remote)
         startRefresh()
     }
 
@@ -184,16 +190,8 @@ class CanVehicleReader(private val context: Context) {
                 val missing = missingIds()
                 if (missing.isEmpty()) return@launch
 
-                // Asking outright beats waiting for a change, but only once the
-                // reply can be trusted — so proving the layout comes first and
-                // nothing is applied from get() until it succeeds.
-                if (!layoutProven) proveLayout(remote)
-                if (layoutProven) {
-                    missing.forEach { id ->
-                        SyuGet.get(remote, id)?.ints?.firstOrNull()?.let { apply(id, it) }
-                    }
-                    if (missingIds().isEmpty()) return@launch
-                }
+                fetch(remote, missing)
+                if (missingIds().isEmpty()) return@launch
                 missing.forEach { id ->
                     // Released first: registering twice for the same id would
                     // leave a callback behind that nothing ever unregisters.
@@ -210,43 +208,34 @@ class CanVehicleReader(private val context: Context) {
         }
     }
 
-    /**
-     * Checks the decoded reply against a value already known by another route.
-     *
-     * A parcel read with the wrong field layout returns numbers rather than an
-     * error, so nothing about a successful decode says it is correct. The only
-     * honest test is to ask for something the answer to is already known: get
-     * the engine speed and compare it against what the callback is reporting
-     * for the same id at the same moment. Two independent paths agreeing on a
-     * number that is neither round nor zero is not a coincidence.
-     *
-     * Which is why a stationary engine cannot prove anything — zero matches
-     * zero whatever the layout — so proof waits for the car to be running. Until
-     * then get() is simply not used, and the subscription retry carries on.
-     */
-    private fun proveLayout(remote: IRemoteModule) {
-        val reference = _vehicle.value.engineRpm?.takeIf { it > 0 }
-            ?: _vehicle.value.speedKph?.takeIf { it > 0 }
-            ?: return
-        val referenceId = if (_vehicle.value.engineRpm?.let { it > 0 } == true) ID_ENGINE else ID_SPEED
-
-        val answered = SyuGet.get(remote, referenceId)
-        if (answered == null) {
-            // No layout fit at all. The bytes are written once so the next
-            // attempt reads the layout off the evidence instead of guessing.
-            if (!rawDumped) {
-                rawDumped = true
-                SyuGet.dumpRaw(context, remote, listOf(ID_ENGINE, ID_OUTSIDE_TEMP, ID_FUEL))
+    /** Reads the ids given, applying whatever the service answers. */
+    private fun fetch(remote: IRemoteModule, ids: List<Int>) {
+        ids.forEach { id ->
+            val reply = SyuGet.get(remote, id)
+            if (reply == null) {
+                if (!rawDumped) {
+                    rawDumped = true
+                    SyuGet.dumpRaw(context, remote, listOf(ID_ENGINE, ID_OUTSIDE_TEMP, ID_FUEL))
+                }
+                return@forEach
             }
-            return
+            reply.ints.firstOrNull()?.let { apply(id, it) }
         }
+    }
 
-        val value = answered.ints.firstOrNull() ?: return
-        // Engine speed drifts between the two reads, so exact equality would
-        // reject a correct layout. The margin is wide enough to absorb that and
-        // far too narrow for an unrelated field to land inside by chance.
-        val tolerance = maxOf(150, reference / 5)
-        if (kotlin.math.abs(value - reference) <= tolerance) layoutProven = true
+    /**
+     * Asks whether this car has an outside temperature sensor at all.
+     *
+     * The vendor keeps a block of capability ids above 1000, separate from the
+     * per-car data ids, and this one answers the question the temperature widget
+     * cannot otherwise distinguish: a car with no sensor and a car whose reading
+     * has not arrived yet both show a blank. One is permanent and the other is a
+     * matter of waiting, and they deserve different words on screen.
+     */
+    private fun readSensorPresence(remote: IRemoteModule) {
+        SyuGet.get(remote, ID_EXIST_TEMP_OUT)?.ints?.firstOrNull()?.let { present ->
+            _vehicle.update { it.copy(tempSensorPresent = present != 0) }
+        }
     }
 
     private fun missingIds(): List<Int> {
@@ -311,6 +300,14 @@ class CanVehicleReader(private val context: Context) {
         const val ID_GEAR = 131
         const val ID_OUTSIDE_TEMP = 123
         const val ID_FUEL = 106
+
+        /**
+         * Capability id, from the vendor's own FinalCanbus: whether the car
+         * reports an outside temperature. It sits in the block above 1000 that
+         * describes the installation rather than the drive, well outside the
+         * per-car range the decoder class defines.
+         */
+        const val ID_EXIST_TEMP_OUT = 1012
 
         /** The id range the diagnostic sweep covers, and that it works over. */
         const val ID_COUNT = 256

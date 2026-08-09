@@ -13,13 +13,12 @@ import java.io.File
  * never comes. IRemoteModule.get answers immediately, and it is a read — unlike
  * cmd, it cannot alter how the CAN box is configured.
  *
- * What stands in the way is the reply. get returns a ModuleObject, a type the
- * vendor defined and whose field layout is not published, and a parcel read
- * against the wrong layout does not fail — it returns plausible numbers. So the
- * generated stub is bypassed entirely: the transaction is made by hand and the
- * reply parcel is decoded by trying candidate layouts, with the result treated
- * as untrusted until [SyuGetLayout] has been proven against a value already
- * known from the callback.
+ * The reply is decoded by hand rather than through the generated stub. get
+ * returns ModuleObject, which is not a self-describing parcelable — the vendor
+ * marshals its three arrays inline — so a stub generated from our own AIDL
+ * would read it as a parcelable and get nonsense. The layout used here is taken
+ * from the vendor's own generated code, so it is transcribed rather than
+ * inferred.
  */
 object SyuGet {
 
@@ -27,23 +26,18 @@ object SyuGet {
     private const val TRANSACTION_GET = 2
     private const val DESCRIPTOR = "com.syu.ipc.IRemoteModule"
 
-    /** Beyond this an "array length" is being read out of the wrong offset. */
-    private const val MAX_SANE_ARRAY = 64
-
     data class Reply(
         val ints: List<Int>,
         val floats: List<Float>,
-        val strings: List<String>,
-        /** Which candidate layout parsed it, for the record. */
-        val layout: String
+        val strings: List<String>
     )
 
     /**
-     * Performs the call and decodes the reply, or null if nothing parsed.
+     * Performs the call and decodes the reply, or null if there is none.
      *
-     * Null covers both a service that refused the transaction and a reply no
-     * candidate layout fits. Neither is worth distinguishing at the call site:
-     * in both cases there is no value to use.
+     * Null covers a refused transaction and a service with nothing to say for
+     * that id. Neither is worth telling apart at the call site: in both cases
+     * there is no value to use.
      */
     fun get(remote: IRemoteModule, id: Int): Reply? {
         val data = Parcel.obtain()
@@ -51,60 +45,33 @@ object SyuGet {
         return try {
             data.writeInterfaceToken(DESCRIPTOR)
             data.writeInt(id)
-            // The three argument arrays the interface declares. Empty rather
-            // than null: a null array is a distinct wire encoding and some
-            // vendor stubs dereference it without checking.
-            data.writeIntArray(IntArray(0))
-            data.writeFloatArray(FloatArray(0))
-            data.writeStringArray(emptyArray())
+            // Null, not empty. The vendor's own callers pass get(code, null,
+            // null, null), and a null array is a distinct encoding on the wire
+            // (length -1) from an empty one (length 0).
+            data.writeIntArray(null)
+            data.writeFloatArray(null)
+            data.writeStringArray(null)
 
             val ok = remote.asBinder().transact(TRANSACTION_GET, data, reply, 0)
             if (!ok) return null
 
             reply.readException()
-            // AIDL writes a presence flag before a nullable parcelable return.
+            // A presence flag, then the three arrays in this order. Taken from
+            // the vendor's own generated stub rather than guessed: it writes
+            // writeInt(1), writeIntArray, writeFloatArray, writeStringArray, and
+            // returns writeInt(0) alone when it has nothing.
             if (reply.readInt() == 0) return null
-
-            val body = reply.dataPosition()
-            LAYOUTS.firstNotNullOfOrNull { (name, parse) ->
-                reply.setDataPosition(body)
-                runCatching { parse(reply)?.copy(layout = name) }.getOrNull()
-            }
+            Reply(
+                ints = reply.createIntArray()?.toList().orEmpty(),
+                floats = reply.createFloatArray()?.toList().orEmpty(),
+                strings = reply.createStringArray()?.filterNotNull().orEmpty()
+            )
         } catch (e: Exception) {
             null
         } finally {
             reply.recycle()
             data.recycle()
         }
-    }
-
-    /**
-     * Candidate layouts, most likely first.
-     *
-     * The callback delivers (int[], float[], String[]) and a return type built
-     * to carry the same payload is the obvious shape, with a leading id as the
-     * next most likely variation. Each returns null rather than throwing when
-     * the numbers it reads are not credible, so an unfit layout is rejected
-     * instead of producing a value.
-     */
-    private val LAYOUTS: List<Pair<String, (Parcel) -> Reply?>> = listOf(
-        "ints,floats,strings" to { p -> readTriple(p) },
-        "id,ints,floats,strings" to { p -> p.readInt(); readTriple(p) },
-        "ints" to { p ->
-            val ints = p.createIntArray()
-            if (ints == null || ints.size > MAX_SANE_ARRAY) null
-            else Reply(ints.toList(), emptyList(), emptyList(), "")
-        }
-    )
-
-    private fun readTriple(p: Parcel): Reply? {
-        val ints = p.createIntArray() ?: return null
-        if (ints.size > MAX_SANE_ARRAY) return null
-        val floats = p.createFloatArray() ?: return null
-        if (floats.size > MAX_SANE_ARRAY) return null
-        val strings = p.createStringArray() ?: return null
-        if (strings.size > MAX_SANE_ARRAY) return null
-        return Reply(ints.toList(), floats.toList(), strings.filterNotNull(), "")
     }
 
     /**
@@ -132,9 +99,9 @@ object SyuGet {
                     try {
                         data.writeInterfaceToken(DESCRIPTOR)
                         data.writeInt(id)
-                        data.writeIntArray(IntArray(0))
-                        data.writeFloatArray(FloatArray(0))
-                        data.writeStringArray(emptyArray())
+                        data.writeIntArray(null)
+                        data.writeFloatArray(null)
+                        data.writeStringArray(null)
                         val ok = remote.asBinder().transact(TRANSACTION_GET, data, reply, 0)
                         append("transact: $ok\n")
                         if (!ok) continue

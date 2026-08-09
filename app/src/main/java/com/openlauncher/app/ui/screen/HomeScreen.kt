@@ -543,6 +543,7 @@ fun HomeScreen(
                         "TEMPERATURE" -> TemperatureWidget(
                             ambientTempC = vehicle.ambientTempC,
                             canConnected = vehicle.canConnected,
+                            tempSensorPresent = vehicle.tempSensorPresent,
                             accent       = accent,
                             metric       = settings.unitSystem.name == "METRIC",
                             isDayMode    = isDayMode,
