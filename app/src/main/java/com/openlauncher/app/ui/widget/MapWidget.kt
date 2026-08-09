@@ -104,6 +104,9 @@ private const val SNAP_BELOW_PX = 150f
 private object MapViewHolder {
     private var instance: MapView? = null
 
+    /** The style currently applied, so a changed one is noticed. */
+    var appliedStyle: String? = null
+
     /**
      * Whether the camera follows the vehicle, and the zoom it is at.
      *
@@ -308,7 +311,18 @@ fun MapWidget(
                     // was perfectly loaded — and the marker simply vanished.
                     if (map.style != null) styleReady = true
 
+                    // Re-applied when the file changes, which it does on a switch
+                    // between day and night: the palette lives in the style, and
+                    // testing only for a missing style left the map black under a
+                    // light interface.
+                    if (map.style != null && MapViewHolder.appliedStyle != styleUri) {
+                        MapViewHolder.appliedStyle = styleUri
+                        styleReady = false
+                        map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
+                    }
+
                     if (map.style == null) {
+                        MapViewHolder.appliedStyle = styleUri
                         map.setStyle(Style.Builder().fromUri(styleUri)) { styleReady = true }
                         // Placed before any fix exists. The camera was only ever
                         // touched once a position arrived, so until then the map

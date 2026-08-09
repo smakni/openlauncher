@@ -70,13 +70,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
      * Style URI with its tile source resolved. Rewritten on each call because an
      * archive can be imported, or the remote build changed, between calls.
      */
-    fun mapStyleUri(): String = runCatching {
+    fun mapStyleUri(dayMode: Boolean = false): String = runCatching {
         com.openlauncher.app.util.OfflineMapStore.resolvedStyleUri(
             getApplication(),
             settings.value.pmtilesUrl,
             settings.value.tileUrlTemplate,
             showPlaces = settings.value.mapShowPlaces,
-            localTileTemplate = localTileTemplate()
+            localTileTemplate = localTileTemplate(),
+            dayMode = dayMode
         )
     }.getOrDefault("")
 

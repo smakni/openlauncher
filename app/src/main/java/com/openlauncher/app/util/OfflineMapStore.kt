@@ -113,7 +113,8 @@ object OfflineMapStore {
         tileUrlTemplate: String = "",
         tilted: Boolean = false,
         showPlaces: Boolean = false,
-        localTileTemplate: String = ""
+        localTileTemplate: String = "",
+        dayMode: Boolean = false
     ): String {
         val archive = installedPmTiles(context)
         // A tile template wins over everything: it is the only source the region
@@ -144,7 +145,10 @@ object OfflineMapStore {
         // Layer surgery is done on the parsed document rather than by patching
         // text: the flat and raised building layers are not interchangeable
         // strings, and a style that fails to parse renders as nothing at all.
-        val patched = runCatching { withLayers(json, tilted, showPlaces) }.getOrDefault(json)
+        val withLayers = runCatching { withLayers(json, tilted, showPlaces) }.getOrDefault(json)
+        // Recoloured after the layers are settled, so anything injected above is
+        // caught by the same pass rather than needing its own light variant.
+        val patched = if (dayMode) recolourForDay(withLayers) else withLayers
         styleFile.writeText(patched)
         return "file://${styleFile.absolutePath}"
     }
@@ -227,6 +231,41 @@ object OfflineMapStore {
             ?.mapNotNull { it.name.toIntOrNull() }
             ?.maxOrNull()
             ?: 15
+
+    /**
+     * Swaps the night palette for a daylight one.
+     *
+     * A second style file was the alternative and would have had to be kept in
+     * step with this one by hand; every layer added to the dark map would have
+     * needed remembering in the light one. Substituting the colours keeps a
+     * single source and cannot drift.
+     *
+     * The ink and the paper trade places rather than simply inverting: roads
+     * become the lightest thing on the map because that is how a paper map
+     * reads, with the land tinted around them.
+     */
+    private fun recolourForDay(json: String): String {
+        var out = json
+        DAY_PALETTE.forEach { (night, day) -> out = out.replace(night, day) }
+        return out
+    }
+
+    private val DAY_PALETTE = listOf(
+        "#12151a" to "#F6F4F1",  // background, and every label halo
+        "#1a1e25" to "#EFEDE8",  // earth
+        "#1e2530" to "#E6EADF",  // landuse
+        "#16324a" to "#BFD5E6",  // water
+        "#252b34" to "#E2DFD8",  // buildings
+        "#2b323d" to "#E2DFD8",  // buildings, raised
+        "#333b46" to "#FFFFFF",  // minor roads
+        "#454f5d" to "#FFFFFF",  // medium roads
+        "#5b6675" to "#F8F0E0",  // major roads
+        "#7d8899" to "#F2DCAC",  // highways
+        "#4a5260" to "#C6C2BA",  // boundaries
+        "#9aa4b2" to "#5F5D66",  // road labels
+        "#c3cbd6" to "#3A3940",  // place labels
+        "#a8b2c0" to "#6B6A72"   // points of interest
+    )
 
     fun remove(context: Context, name: String): Boolean =
         File(baseDir(context), name).takeIf { it.isFile }?.delete() ?: false

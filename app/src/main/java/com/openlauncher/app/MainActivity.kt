@@ -79,9 +79,6 @@ class MainActivity : ComponentActivity() {
             // that change it rather than run on every recomposition. Both keys
             // matter: keyed on the PMTiles URL alone, switching to a tile
             // template left the old style in place and the source unchanged.
-            val mapStyleUri = remember(settings.pmtilesUrl, settings.tileUrlTemplate) {
-                vm.mapStyleUri()
-            }
             val hasMapData = remember(settings.pmtilesUrl, settings.tileUrlTemplate) {
                 vm.hasMapData()
             }
@@ -93,6 +90,12 @@ class MainActivity : ComponentActivity() {
             val hardwareRadio by vm.hardwareRadio.collectAsStateWithLifecycle()
             val systemIsDark = isSystemInDarkTheme()
             val isDayMode = if (settings.dayNightMode == DayNightMode.SYSTEM) !systemIsDark else isDayModeVM
+            // Day mode is a key too: the style file carries the palette, so a
+            // switch between night and day has to rewrite it. Without that the
+            // map stayed black under a light interface.
+            val mapStyleUri = remember(settings.pmtilesUrl, settings.tileUrlTemplate, isDayMode) {
+                vm.mapStyleUri(isDayMode)
+            }
             val pickerSlot      by vm.shortcutPickerSlot.collectAsStateWithLifecycle()
             val appPickerTarget by vm.appPickerTarget.collectAsStateWithLifecycle()
 

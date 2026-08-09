@@ -33,13 +33,18 @@ fun OpenLauncherTheme(
         secondary        = accent.copy(alpha = 0.7f),
         onSecondary      = onAccent,
         tertiary         = accent.copy(alpha = 0.5f),
-        background       = if (useCustomBg) background else Color(0xFFEEEEEE),
-        surface          = Color(0xFFFFFFFF),
-        onBackground     = Color(0xFF111111),
-        onSurface        = Color(0xFF111111),
-        surfaceVariant   = Color(0xFFF5F5F5),
-        onSurfaceVariant = Color(0xFF666666),
-        outline          = Color(0xFFCCCCCC)
+        // Warm and low-contrast rather than white on near-black. Pure white
+        // against #111 is the brightest pairing a screen can make, and on a
+        // panel at arm's length in daylight it glares — the eye reads the glow
+        // before it reads the text. Backing both ends off a little keeps the
+        // separation while taking away the shout.
+        background       = if (useCustomBg) background else Color(0xFFF2F0EC),
+        surface          = Color(0xFFFAF8F5),
+        onBackground     = Color(0xFF2B2A2E),
+        onSurface        = Color(0xFF2B2A2E),
+        surfaceVariant   = Color(0xFFEDEAE4),
+        onSurfaceVariant = Color(0xFF6E6B66),
+        outline          = Color(0xFFD9D5CE)
     ) else darkColorScheme(
         primary          = accent,
         onPrimary        = onAccent,

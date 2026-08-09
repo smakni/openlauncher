@@ -86,6 +86,7 @@ fun SettingsScreen(
     var canDbResult by remember { mutableStateOf<String?>(null) }
     var micResult by remember { mutableStateOf<String?>(null) }
     var tileTestResult by remember { mutableStateOf<String?>(null) }
+    var canIdResult by remember { mutableStateOf<String?>(null) }
     // Read once on entry: the file is written by the handler of a process that
     // is on its way out, so it cannot change while this screen is open.
     var lastCrash by remember {
@@ -1230,6 +1231,29 @@ fun SettingsScreen(
                         == PackageManager.PERMISSION_GRANTED
                     ) runMicProbe() else runCatching {
                         micPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+            )
+
+            SettingsDivider()
+
+            SettingsButton(
+                label    = "Dump Vendor Data IDs",
+                sublabel = canIdResult
+                    ?: "Reads the id constants out of the installed CAN box class",
+                icon     = Icons.Default.Tag,
+                accent   = accent,
+                onClick  = {
+                    canIdResult = "reading…"
+                    probeScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        val result = runCatching {
+                            val text = com.openlauncher.app.util.CanIdDumper.dump(context)
+                            val dir = java.io.File(context.getExternalFilesDir(null), "vendor")
+                                .apply { mkdirs() }
+                            java.io.File(dir, "can-ids.txt").writeText(text)
+                            "saved · ${text.lines().size} lines"
+                        }.getOrElse { "failed: ${it.javaClass.simpleName}: ${it.message}" }
+                        withContext(kotlinx.coroutines.Dispatchers.Main) { canIdResult = result }
                     }
                 }
             )
