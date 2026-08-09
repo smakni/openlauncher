@@ -34,20 +34,21 @@ import com.openlauncher.app.util.SyuProbe
 import kotlinx.coroutines.delay
 
 /**
- * Protocol numbers the vendor CAN database lists for Land Rover, by id_value.
+ * Protocol numbers seen so far, by id_value.
  *
- * The MCU holds the selected protocol as a plain number, and these are the only
- * two the database offers for this brand. Naming them turns one line of the
- * sweep into an answer the factory menu would otherwise have to be opened to
- * read.
+ * Both belong to HiWorld, and this unit's decoder is ZHTD — so neither is the
+ * one it runs. They are kept because naming a value that does appear costs
+ * nothing, and labelled by maker so they cannot be mistaken for it again: the
+ * database was dumped four hundred rows deep out of five thousand, every Land
+ * Rover entry inside that window happened to be HiWorld, and the conclusion
+ * drawn was about the brand rather than about the window.
  *
- * The distinction matters beyond curiosity — only the second routes the car's
- * own reversing camera, so a unit set to the first shows a black screen with
- * nothing wrong in the wiring.
+ * The ZHTD equivalents are what matter and are not known yet. The unlimited
+ * Land Rover dump exists to find them.
  */
 private val KNOWN_PROTOCOLS = mapOf(
-    411 to "LAND ROVER — base",
-    65947 to "LAND ROVER — high, original reversing camera"
+    411 to "HIWORLD Land Rover — base (not this unit's maker)",
+    65947 to "HIWORLD Land Rover — high, original reversing (not this unit's maker)"
 )
 
 /**
