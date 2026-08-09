@@ -52,6 +52,9 @@ import org.maplibre.android.maps.Style
  */
 private const val DEFAULT_ZOOM = 17.0
 
+/** Long enough for a re-attached GL surface to be live before it is queried. */
+private const val SURFACE_SETTLE_MS = 700L
+
 /**
  * Slightly longer than the second between GPS fixes.
  *
@@ -192,6 +195,20 @@ fun MapWidget(
     // delivers it inside the view's own callback.
     var mapRef by remember { mutableStateOf<org.maplibre.android.maps.MapLibreMap?>(null) }
 
+    // Rendered-feature queries are held off until the surface has had time to
+    // come back. Returning from another screen re-attaches the retained MapView
+    // and rebuilds its GL surface, and querying across that gap kills the
+    // process in native code — below the level any handler can reach, which is
+    // why such a crash leaves no report at all.
+    var surfaceSettled by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        surfaceSettled = false
+        com.openlauncher.app.util.CrashLog.step(context, "map: attaching view")
+        kotlinx.coroutines.delay(SURFACE_SETTLE_MS)
+        surfaceSettled = true
+        com.openlauncher.app.util.CrashLog.step(context, "map: surface settled")
+    }
+
     // Driven by the inputs rather than by recomposition. The AndroidView update
     // block runs on every recomposition, and the home screen recomposes
     // constantly — engine data, clock, speed. Each pass restarted a one-second
@@ -199,7 +216,10 @@ fun MapWidget(
     // cancelled after covering a few percent of its path and the camera jittered
     // in place instead of travelling. The road query paid the same price, several
     // times a second instead of once a fix.
-    LaunchedEffect(mapRef, location, bearing, tiltDegrees, autoZoomSeconds, following, styleReady) {
+    LaunchedEffect(
+        mapRef, location, bearing, tiltDegrees, autoZoomSeconds,
+        following, styleReady, surfaceSettled
+    ) {
         val map = mapRef ?: return@LaunchedEffect
         if (!following) return@LaunchedEffect
         val fix = location ?: return@LaunchedEffect
@@ -208,7 +228,12 @@ fun MapWidget(
         // Queried against what is already on screen, so this costs no network and
         // no extra geometry — the roads under the marker have necessarily been
         // drawn already.
-        val target = if (roadSnapMetres > 0 && styleReady) {
+        // Every condition here is a way the query has been seen to take the
+        // process down: no surface yet, or a view with no dimensions to query
+        // within.
+        val canQuery = roadSnapMetres > 0 && styleReady && surfaceSettled &&
+            mapView.width > 0 && mapView.height > 0
+        val target = if (canQuery) {
             val cx = mapView.width / 2f
             val cy = mapView.height / 2f
             val box = android.graphics.RectF(

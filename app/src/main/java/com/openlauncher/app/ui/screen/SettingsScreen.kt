@@ -1298,11 +1298,17 @@ fun SettingsScreen(
 
             SettingsButton(
                 label    = "Last Crash",
+                // The last step is shown alongside, because a native fault kills
+                // the process below any handler and leaves no trace at all — so
+                // "no crash recorded" and "nothing went wrong" look identical
+                // without it.
                 sublabel = lastCrash
                     ?.lineSequence()
                     ?.firstOrNull { it.startsWith("when") }
                     ?.plus(" — press to clear")
-                    ?: "None recorded",
+                    ?: ("None recorded · last step: " +
+                        (com.openlauncher.app.util.CrashLog.lastStep(context)?.trim()
+                            ?: "none")),
                 icon     = Icons.Default.BugReport,
                 accent   = accent,
                 onClick  = {

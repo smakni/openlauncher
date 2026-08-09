@@ -24,6 +24,7 @@ import java.util.Locale
 object CrashLog {
 
     private const val FILE_NAME = "crash.txt"
+    private const val STEP_FILE = "last-step.txt"
 
     fun install(context: Context) {
         val app = context.applicationContext
@@ -37,8 +38,30 @@ object CrashLog {
         }
     }
 
+    /**
+     * Records that a risky step is about to be taken.
+     *
+     * A native fault kills the process below the level any handler can reach, so
+     * it leaves no stack trace at all — which is what "it crashed and there is no
+     * report" means. Writing the step before taking it means the file names
+     * whatever was in progress when the process died, which is the next best
+     * thing to a trace and the only thing available without a cable.
+     */
+    fun step(context: Context, name: String) {
+        runCatching {
+            val stamp = SimpleDateFormat("HH:mm:ss.SSS", Locale.US).format(Date())
+            File(dir(context), STEP_FILE).writeText("$stamp  $name")
+        }
+    }
+
+    fun lastStep(context: Context): String? =
+        runCatching { File(dir(context), STEP_FILE).takeIf { it.isFile }?.readText() }.getOrNull()
+
+    private fun dir(context: Context): File =
+        File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }
+
     fun file(context: Context): File =
-        File(File(context.getExternalFilesDir(null), "vendor").apply { mkdirs() }, FILE_NAME)
+        File(dir(context), FILE_NAME)
 
     fun read(context: Context): String? =
         runCatching { file(context).takeIf { it.isFile }?.readText() }.getOrNull()
