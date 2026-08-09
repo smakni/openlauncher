@@ -2,6 +2,7 @@ package com.openlauncher.app.ui.widget
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -77,19 +78,25 @@ fun TemperatureWidget(
                 if (metric) "%.0f".format(ambientTempC)
                 else "%.0f".format(ambientTempC * 9 / 5 + 32)
 
-            Text(
-                shown,
-                color = accent,
-                fontSize = 40.sp,
-                fontWeight = FontWeight.Light,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                if (metric) "°C" else "°F",
-                color = labelColor,
-                fontSize = 11.sp,
-                letterSpacing = 1.sp
-            )
+            // The unit sits beside the figure rather than under it, and is
+            // aligned to the top of the digits: dropped to the baseline it reads
+            // as part of the number instead of a suffix to it.
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    shown,
+                    color = accent,
+                    fontSize = 40.sp,
+                    fontWeight = FontWeight.Light,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    if (metric) "°C" else "°F",
+                    color = labelColor,
+                    fontSize = 13.sp,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(start = 3.dp, top = 6.dp)
+                )
+            }
 
             // Below freezing is the one thing this widget exists to catch, so it
             // says so rather than leaving a small negative sign to carry it.
