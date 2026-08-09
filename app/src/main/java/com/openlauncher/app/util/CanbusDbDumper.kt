@@ -113,6 +113,29 @@ object CanbusDbDumper {
         }
     }.getOrElse { "cannot open as SQLite: ${it.javaClass.simpleName}\n" }
 
+    /**
+     * Every Land Rover protocol, joined to the names that make it legible.
+     *
+     * The English columns are used because the Chinese ones arrive mis-encoded
+     * through this route, and the decoder maker is the answer being looked for —
+     * a protocol number alone says nothing about which box is fitted.
+     */
+    private const val LANDROVER_QUERY = """
+        SELECT b.id_value, b.canbus_canbox_en AS variant,
+               co.canbus_company_en AS maker,
+               t.canbus_cartype_en AS model,
+               b.name AS note
+        FROM canbus_canbox b
+        LEFT JOIN canbus_company co ON co.id = b.company_id
+        LEFT JOIN canbus_cartype t  ON t.id  = b.cartype_id
+        LEFT JOIN canbus_carset  cs ON cs.id = b.carset_id
+        WHERE cs.canbus_carset_en LIKE '%androver%'
+           OR t.canbus_cartype_en LIKE '%androver%'
+           OR t.canbus_cartype_en LIKE '%reelander%'
+           OR t.canbus_cartype_en LIKE '%ange%'
+        ORDER BY b.id_value
+    """
+
     /** Enough to see the shape of a table without producing an unreadable file. */
     private const val ROW_LIMIT = 400
 }
