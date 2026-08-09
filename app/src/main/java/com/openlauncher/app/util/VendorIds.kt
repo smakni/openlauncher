@@ -33,8 +33,16 @@ object VendorIds {
         Signal(105, "Speed", "km/h"),
         Signal(107, "Engine", "rpm"),
         Signal(131, "Gear", "P/R/N/D"),
-        Signal(137, "Volume", ""),
-        Signal(123, "Outside temp", "°C"),
+        // The decoder declares a volume id and this car does not send it: it
+        // never appeared while every neighbouring id did. The head unit's own
+        // volume lives on the sound module instead — see SOUND_SIGNALS.
+        Signal(137, "Volume (not sent by this car)", ""),
+        // Reads a constant 127 parked. That is either the invalid marker a
+        // signed byte uses, or the common half-degree encoding, which would put
+        // it at 23.5°C — a believable figure for a car in the sun. One reading
+        // cannot separate the two, so it stays raw rather than being shown as a
+        // temperature that might be a placeholder.
+        Signal(123, "Outside temp (raw)", ""),
         Signal(106, "Fuel remaining", ""),
         Signal(108, "Total mileage", "km"),
         Signal(104, "Handbrake", ""),
@@ -54,7 +62,23 @@ object VendorIds {
         Signal(172, "Land Rover LVDS type", "")
     )
 
+    /** The toolkit module carrying the head unit's own audio state. */
+    const val SOUND_MODULE = 4
+
+    /**
+     * Sound-module signals.
+     *
+     * The CAN decoder's volume id is silent on this car, but module 4 carries a
+     * value that sits where a volume would and moves in the right range. Named
+     * as a candidate rather than a fact — it was found by where it appeared,
+     * which is exactly the kind of inference the decoder class replaced.
+     */
+    val SOUND_SIGNALS: List<Signal> = listOf(
+        Signal(2, "Volume (candidate)", "")
+    )
+
     private val BY_ID: Map<Int, Signal> = SIGNALS.associateBy { it.id }
+    private val SOUND_BY_ID: Map<Int, Signal> = SOUND_SIGNALS.associateBy { it.id }
 
     /**
      * The name for an id, or null when it is not one of the known signals.
@@ -63,8 +87,11 @@ object VendorIds {
      * different on every other module, and a confident wrong label is worse than
      * no label at all.
      */
-    fun label(module: Int, id: Int): String? =
-        if (module != CANBUS_MODULE) null else BY_ID[id]?.name
+    fun label(module: Int, id: Int): String? = when (module) {
+        CANBUS_MODULE -> BY_ID[id]?.name
+        SOUND_MODULE -> SOUND_BY_ID[id]?.name
+        else -> null
+    }
 
     data class Signal(val id: Int, val name: String, val unit: String)
 }
