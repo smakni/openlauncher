@@ -43,26 +43,20 @@ fun TelemetryWidget(
         verticalArrangement = Arrangement.SpaceBetween
     ) {
         // ── Fix indicator ────────────────────────────────────────────────────
-        // A compass with no fix still points somewhere: the heading is held from
-        // the last known one across restarts, so a stale needle is
-        // indistinguishable from a live one without saying so. A dot costs
-        // almost nothing and removes the ambiguity entirely.
+        // Shown only when there is no fix. A compass with none still points
+        // somewhere — the heading is held from the last known one across
+        // restarts — so a stale needle cannot be told from a live one. Marking
+        // the working case as well would put a permanent light on the screen to
+        // say that nothing is wrong, which is noise.
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.End
         ) {
-            val live = location != null
-            Canvas(modifier = Modifier.size(6.dp)) {
-                drawCircle(color = if (live) accent else Color(0xFF6E4A4A))
+            if (location == null) {
+                Canvas(modifier = Modifier.size(6.dp)) {
+                    drawCircle(color = Color(0xFFD05353))
+                }
             }
-            Spacer(Modifier.width(5.dp))
-            Text(
-                if (live) "GPS" else "NO FIX",
-                color = if (live) accent else subColor,
-                fontSize = 7.sp,
-                letterSpacing = 1.sp
-            )
         }
 
         // ── Compass ring — fills available space ─────────────────────────────
