@@ -14,6 +14,14 @@ data class VehicleState(
     val speedKph: Int? = null,
     val coolantTempC: Int? = null,
     val intakeTempC: Int? = null,
+    /**
+     * Outside air, from the CAN decoder rather than the ECU.
+     *
+     * A half rather than a whole degree because that is the resolution the
+     * decoder sends; rounding it here would throw away a step the car took the
+     * trouble to report.
+     */
+    val ambientTempC: Double? = null,
     val oilTempC: Int? = null,
     val engineLoadPct: Float? = null,
     val throttlePct: Float? = null,
@@ -26,6 +34,7 @@ data class VehicleState(
 ) {
     val hasAnyReading: Boolean
         get() = rpm != null || speedKph != null || coolantTempC != null ||
+                ambientTempC != null ||
                 boostBar != null || batteryVolts != null
 }
 

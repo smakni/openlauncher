@@ -37,12 +37,7 @@ object VendorIds {
         // never appeared while every neighbouring id did. The head unit's own
         // volume lives on the sound module instead — see SOUND_SIGNALS.
         Signal(137, "Volume (not sent by this car)", ""),
-        // Reads a constant 127 parked. That is either the invalid marker a
-        // signed byte uses, or the common half-degree encoding, which would put
-        // it at 23.5°C — a believable figure for a car in the sun. One reading
-        // cannot separate the two, so it stays raw rather than being shown as a
-        // temperature that might be a placeholder.
-        Signal(123, "Outside temp (raw)", ""),
+        Signal(123, "Outside temp", "°C"),
         Signal(106, "Fuel remaining", ""),
         Signal(108, "Total mileage", "km"),
         Signal(104, "Handbrake", ""),
@@ -92,6 +87,17 @@ object VendorIds {
         SOUND_MODULE -> SOUND_BY_ID[id]?.name
         else -> null
     }
+
+    /**
+     * Outside temperature, in degrees.
+     *
+     * Half-degree steps, confirmed against the car, with the minus-forty offset
+     * automotive CAN uses almost universally — the pair puts the 127 read while
+     * parked at 23.5°C. The offset is the half of this not directly confirmed:
+     * were it absent the reading would sit exactly forty degrees high, which is
+     * not a subtle error to spot.
+     */
+    fun outsideTempC(raw: Int): Double = raw / 2.0 - 40.0
 
     data class Signal(val id: Int, val name: String, val unit: String)
 }

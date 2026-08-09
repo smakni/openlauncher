@@ -126,7 +126,8 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         kotlinx.coroutines.flow.combine(obdMgr.vehicle, canReader.vehicle) { obd, can ->
             obd.copy(
                 rpm = obd.rpm ?: can.engineRpm,
-                speedKph = obd.speedKph ?: can.speedKph
+                speedKph = obd.speedKph ?: can.speedKph,
+                ambientTempC = can.outsideTempC
             )
         }.stateIn(viewModelScope, SharingStarted.Eagerly, VehicleState())
 

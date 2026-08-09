@@ -50,6 +50,11 @@ fun VehicleWidget(
         state.engineLoadPct?.let { add("LOAD" to "%.0f%%".format(it)) }
         state.throttlePct?.let { add("THROTTLE" to "%.0f%%".format(it)) }
         state.intakeTempC?.let { add("INTAKE" to tempText(it, metric)) }
+        // Kept to one decimal: the decoder reports half degrees, and rounding
+        // would show a still reading stepping by a whole degree at a time.
+        state.ambientTempC?.let {
+            add("OUTSIDE" to if (metric) "%.1f°C".format(it) else "%.0f°F".format(it * 9 / 5 + 32))
+        }
         state.fuelLevelPct?.let { add("TANK" to "%.0f%%".format(it)) }
         state.batteryVolts?.let { add("BATTERY" to "%.1f V".format(it)) }
     }
