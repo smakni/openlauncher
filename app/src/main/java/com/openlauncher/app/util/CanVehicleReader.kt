@@ -58,6 +58,9 @@ class CanVehicleReader(private val context: Context) {
         val indicatorLeft: Boolean? = null,
         val indicatorRight: Boolean? = null,
         val connected: Boolean = false,
+        /** Head unit volume, from the sound module. Not a CAN signal. */
+        val volume: Int? = null,
+        val muted: Boolean? = null,
         /** Whether the car has an outside temperature sensor; null until asked. */
         val tempSensorPresent: Boolean? = null
     )
@@ -67,6 +70,8 @@ class CanVehicleReader(private val context: Context) {
 
     private var toolkit: IRemoteToolkit? = null
     private var module: IRemoteModule? = null
+    private var soundModule: IRemoteModule? = null
+    private var obdModule: IRemoteModule? = null
     // Kept with the id they were registered under: unregistering needs both,
     // and a callback released against the wrong id leaves the real one live.
     //
@@ -75,6 +80,12 @@ class CanVehicleReader(private val context: Context) {
     // throws. With no ADB on this unit that crash would surface as the launcher
     // vanishing, with nothing to read afterwards.
     private val callbacks = mutableListOf<Pair<Int, IModuleCallback>>()
+
+    private val soundCallbacks = mutableListOf<Pair<Int, IModuleCallback>>()
+    private val obdCallbacks = mutableListOf<Pair<Int, IModuleCallback>>()
+
+    /** Whatever the sound and OBD modules report, for the written diagnostic. */
+    private val observed = linkedMapOf<Pair<Int, Int>, List<Int>>()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var refreshJob: Job? = null
@@ -117,9 +128,21 @@ class CanVehicleReader(private val context: Context) {
                 callbacks.clear()
             }
         }
+        synchronized(callbacks) {
+            soundModule?.let { remote ->
+                soundCallbacks.forEach { (id, cb) -> runCatching { remote.unregister(cb, id) } }
+            }
+            soundCallbacks.clear()
+            obdModule?.let { remote ->
+                obdCallbacks.forEach { (id, cb) -> runCatching { remote.unregister(cb, id) } }
+            }
+            obdCallbacks.clear()
+        }
         runCatching { context.unbindService(connection) }
         toolkit = null
         module = null
+        soundModule = null
+        obdModule = null
     }
 
     private fun subscribe() {
@@ -143,7 +166,125 @@ class CanVehicleReader(private val context: Context) {
         (0 until ID_COUNT).forEach { id -> subscribeId(remote, id) }
         (COMMON_ID_FIRST..COMMON_ID_LAST).forEach { id -> subscribeId(remote, id) }
 
+        subscribeSound()
+        subscribeObd()
         startRefresh()
+    }
+
+    /**
+     * The head unit's own volume, which the car does not send.
+     *
+     * The CAN decoder declares a volume id and this car never fills it, so the
+     * figure comes from the sound module instead. Named rather than guessed:
+     * the vendor's FinalSound puts the volume at id 2, the mute at 3 and the
+     * audio source at 12.
+     */
+    private fun subscribeSound() {
+        val remote = runCatching {
+            toolkit?.getRemoteModule(VendorIds.SOUND_MODULE)
+        }.getOrNull() ?: return
+        soundModule = remote
+        VendorIds.SOUND_SIGNALS.forEach { signal ->
+            val callback = object : IModuleCallback.Stub() {
+                override fun update(
+                    updateId: Int,
+                    ints: IntArray?,
+                    floats: FloatArray?,
+                    strings: Array<String>?
+                ) {
+                    val value = ints?.firstOrNull() ?: return
+                    when (updateId) {
+                        SOUND_ID_VOLUME -> _vehicle.update { it.copy(volume = value) }
+                        SOUND_ID_MUTE -> _vehicle.update { it.copy(muted = value != 0) }
+                    }
+                    observe(VendorIds.SOUND_MODULE, updateId, ints)
+                }
+            }
+            runCatching { remote.register(callback, signal.id, 1) }
+                .onSuccess { soundCallbacks += signal.id to callback }
+        }
+    }
+
+    /**
+     * Opens the OBD module to find out whether anything is behind it.
+     *
+     * Nothing here reads a value from it, because nothing knows what its ids
+     * mean — no constants for module 12 ship in any source found. What arrives
+     * is recorded for the diagnostic and nothing else. A module that answers
+     * with the engine running and no dongle fitted would be worth a great deal;
+     * one that stays silent closes the question, and both are findings.
+     */
+    private fun subscribeObd() {
+        val remote = runCatching {
+            toolkit?.getRemoteModule(VendorIds.OBD_MODULE)
+        }.getOrNull() ?: return
+        obdModule = remote
+        (0 until VendorIds.OBD_ID_COUNT).forEach { id ->
+            val callback = object : IModuleCallback.Stub() {
+                override fun update(
+                    updateId: Int,
+                    ints: IntArray?,
+                    floats: FloatArray?,
+                    strings: Array<String>?
+                ) {
+                    observe(VendorIds.OBD_MODULE, updateId, ints)
+                }
+            }
+            runCatching { remote.register(callback, id, 1) }
+                .onSuccess { obdCallbacks += id to callback }
+        }
+    }
+
+    /**
+     * Writes what the sound and OBD modules have said.
+     *
+     * The sound side is a check on names now taken from the vendor's constants;
+     * the OBD side is the open question, and an empty section under it is the
+     * answer that module 12 needs a dongle rather than merely needing asking.
+     */
+    private fun writeObservedReport() {
+        runCatching {
+            val dir = java.io.File(context.getExternalFilesDir(null), "vendor")
+                .apply { mkdirs() }
+            val file = java.io.File(dir, "syu-modules.txt")
+            val snapshot = synchronized(observed) { observed.toMap() }
+            file.writeText(buildString {
+                appendLine("Sound and OBD modules")
+                appendLine("=".repeat(52))
+                appendLine()
+                appendLine("Values arrive by subscription; get() answers nothing here.")
+                appendLine("An empty section means the module reported nothing at all.")
+                appendLine()
+
+                appendLine("--- module ${VendorIds.SOUND_MODULE}: sound ---")
+                val sound = snapshot.filterKeys { it.first == VendorIds.SOUND_MODULE }
+                if (sound.isEmpty()) appendLine("nothing reported")
+                sound.toSortedMap(compareBy { it.second }).forEach { (key, values) ->
+                    val name = VendorIds.label(key.first, key.second) ?: "unnamed"
+                    appendLine("id %-4d %-22s %s".format(key.second, name, values.joinToString(",")))
+                }
+
+                appendLine()
+                appendLine("--- module ${VendorIds.OBD_MODULE}: OBD ---")
+                val obd = snapshot.filterKeys { it.first == VendorIds.OBD_MODULE }
+                if (obd.isEmpty()) {
+                    appendLine("nothing reported")
+                    appendLine()
+                    appendLine("No constants for this module ship in any published")
+                    appendLine("source, so silence here is the whole answer: without a")
+                    appendLine("dongle there is nothing behind it to read.")
+                }
+                obd.toSortedMap(compareBy { it.second }).forEach { (key, values) ->
+                    appendLine("id %-4d %s".format(key.second, values.joinToString(",")))
+                }
+            })
+        }
+    }
+
+    /** Records a reading from a module whose ids have no established meaning. */
+    private fun observe(module: Int, id: Int, ints: IntArray?) {
+        val values = ints?.toList().orEmpty()
+        synchronized(observed) { observed[module to id] = values }
     }
 
     private fun subscribeId(remote: IRemoteModule, id: Int) {
@@ -219,6 +360,7 @@ class CanVehicleReader(private val context: Context) {
                 if (attempt == DIAGNOSE_AFTER_ATTEMPT && !diagnosed) {
                     diagnosed = true
                     SyuGet.report(context, remote, DIAGNOSTIC_IDS)
+                    writeObservedReport()
                 }
                 missing.forEach { id ->
                     // Released first: registering twice for the same id would
@@ -300,6 +442,10 @@ class CanVehicleReader(private val context: Context) {
         const val ID_OUTSIDE_TEMP = 123
         const val ID_FUEL = 106
         const val ID_FUEL_WARNING = 163
+
+        /** From the vendor's FinalSound: U_VOL and U_MUTE on the sound module. */
+        const val SOUND_ID_VOLUME = 2
+        const val SOUND_ID_MUTE = 3
 
         /**
          * The block common to every CAN box, above the per-car ids.

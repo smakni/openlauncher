@@ -61,16 +61,35 @@ object VendorIds {
     const val SOUND_MODULE = 4
 
     /**
-     * Sound-module signals.
+     * Sound-module signals, named from the vendor's own FinalSound.
      *
-     * The CAN decoder's volume id is silent on this car, but module 4 carries a
-     * value that sits where a volume would and moves in the right range. Named
-     * as a candidate rather than a fact — it was found by where it appeared,
-     * which is exactly the kind of inference the decoder class replaced.
+     * The volume was a guess before — a value on module 4 that sat where a
+     * volume would and moved in the right range. It is now a name:
+     * U_VOL = 2. The guess happened to be right, which is luck rather than
+     * method, and the constant is what makes it a fact.
      */
     val SOUND_SIGNALS: List<Signal> = listOf(
-        Signal(2, "Volume (candidate)", "")
+        Signal(2, "Volume", ""),
+        Signal(3, "Mute", ""),
+        Signal(12, "Audio source", ""),
+        Signal(10, "EQ mode", ""),
+        Signal(8, "Balance / fade", ""),
+        Signal(6, "Default volume", ""),
+        Signal(13, "Amplifier", ""),
+        Signal(11, "Loudness", "")
     )
+
+    /**
+     * The unit's OBD module, which nothing here has ever opened.
+     *
+     * Undocumented: no constants for it ship in any source found, and the ids
+     * below are therefore a range to sweep rather than names to read. It is
+     * listed separately from the guessed signals of the past because sweeping a
+     * module to see what answers is a question, while naming its ids without a
+     * source would be an answer nobody has.
+     */
+    const val OBD_MODULE = 12
+    const val OBD_ID_COUNT = 64
 
     private val BY_ID: Map<Int, Signal> = SIGNALS.associateBy { it.id }
     private val SOUND_BY_ID: Map<Int, Signal> = SOUND_SIGNALS.associateBy { it.id }
