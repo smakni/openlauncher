@@ -65,6 +65,15 @@ class CanVehicleReader(private val context: Context) {
         val tempSensorPresent: Boolean? = null
     )
 
+    /**
+     * Called when the car asks the vendor application to show its own screen.
+     *
+     * Deliberately a signal rather than an action taken here: whether to fight
+     * for the foreground is a setting, and this class reads the bus rather than
+     * deciding policy.
+     */
+    var onCarUiRequested: (() -> Unit)? = null
+
     private val _vehicle = MutableStateFlow(CanVehicle())
     val vehicle: StateFlow<CanVehicle> = _vehicle
 
@@ -413,6 +422,13 @@ class CanVehicleReader(private val context: Context) {
                 ID_OUTSIDE_TEMP -> current.copy(outsideTempC = VendorIds.outsideTempC(value))
                 ID_FUEL -> current.copy(fuelRaw = value)
             ID_FUEL_WARNING -> current.copy(lowFuelWarning = value != 0)
+            ID_JUMP_PAGE -> {
+                // The signal that makes the original car screen appear. The
+                // vendor's decoder answers this id by starting its own
+                // car-information activity over whatever is in front.
+                if (value != 0) onCarUiRequested?.invoke()
+                current
+            }
                 ID_HANDBRAKE -> current.copy(handbrake = value != 0)
                 ID_DIPPED -> current.copy(dippedBeam = value != 0)
                 ID_MAIN_BEAM -> current.copy(mainBeam = value != 0)
@@ -444,6 +460,16 @@ class CanVehicleReader(private val context: Context) {
         const val ID_FUEL_WARNING = 163
 
         /** From the vendor's FinalSound: U_VOL and U_MUTE on the sound module. */
+        /**
+         * U_CAR_JUMP_PAGE. The car raises it and the vendor application brings
+         * its own screen to the front.
+         *
+         * Its neighbour U_CAR_BACK_JUMP at 125 does the same thing for the
+         * reversing camera and is deliberately not handled: taking the
+         * foreground back from a reversing camera would be actively dangerous.
+         */
+        const val ID_JUMP_PAGE = 132
+
         const val SOUND_ID_VOLUME = 2
         const val SOUND_ID_MUTE = 3
 

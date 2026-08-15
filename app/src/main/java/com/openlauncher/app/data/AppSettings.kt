@@ -164,7 +164,11 @@ data class AppSettings(
     // for the same reason as the last heading and the last position: a blank at
     // startup reads as broken rather than as pending.
     val lastAmbientTempC: Float = 0f,
-    val lastAmbientTempAtMs: Long = 0L
+    val lastAmbientTempAtMs: Long = 0L,
+    // Whether to come back to the front when the car opens its own screen.
+    // Off by default: it is a launcher taking the foreground from another app,
+    // which is worth doing only when it is what was asked for.
+    val reclaimScreenOnCarUi: Boolean = false
 )
 
 fun defaultShortcuts() = listOf(

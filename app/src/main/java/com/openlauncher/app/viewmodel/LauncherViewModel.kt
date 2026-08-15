@@ -54,6 +54,14 @@ private const val POSITION_SAVE_DEGREES = 0.001
  */
 private const val REMEMBERED_TEMP_MAX_AGE_MS = 3L * 60 * 60 * 1000
 
+/**
+ * The least time between two attempts to take the screen back.
+ *
+ * Long enough that a launcher and a vendor screen cannot trade the foreground
+ * faster than a person can react, which is the failure worth designing against.
+ */
+private const val RECLAIM_MIN_INTERVAL_MS = 4_000L
+
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
 
     private val settingsRepo = SettingsRepository(application)
@@ -179,6 +187,41 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         )
                     }
                 }
+        }
+    }
+
+    /** When the launcher last took the foreground back, to avoid a duel. */
+    @Volatile private var lastReclaimMs = 0L
+
+    /**
+     * Comes back to the front when the car opens the vendor's own screen.
+     *
+     * The car raises U_CAR_JUMP_PAGE and the vendor application answers it by
+     * starting its car-information activity over whatever is showing, which on
+     * ignition is this launcher. Nothing here can stop that application from
+     * starting; the only remedy without system privileges is to ask for the
+     * foreground back.
+     *
+     * Which is why it is off by default and rate limited. Two applications each
+     * insisting on the foreground is a loop the driver cannot escape, so a
+     * reclaim happens at most once in the interval and never twice in a row for
+     * the same signal. If the vendor screen still wins, it wins — better that
+     * than a launcher flickering against it for the rest of the drive.
+     */
+    private fun reclaimScreenFromCarUi() {
+        if (!settings.value.reclaimScreenOnCarUi) return
+        val now = System.currentTimeMillis()
+        if (now - lastReclaimMs < RECLAIM_MIN_INTERVAL_MS) return
+        lastReclaimMs = now
+        runCatching {
+            val context = getApplication<Application>()
+            val intent = Intent(context, com.openlauncher.app.MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                )
+            }
+            context.startActivity(intent)
         }
     }
 
@@ -834,6 +877,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         // Bound for the life of the view model. The decoder reports whether or
         // not a dongle is fitted, so there is nothing to wait for and no setting
         // to gate it behind.
+        canReader.onCarUiRequested = ::reclaimScreenFromCarUi
         runCatching { canReader.start() }
         rememberAmbientTemperature()
 

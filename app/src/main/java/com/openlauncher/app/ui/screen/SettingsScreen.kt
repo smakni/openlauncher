@@ -205,6 +205,23 @@ fun SettingsScreen(
 
             SettingsDivider()
 
+            SettingsRow(
+                label    = "Reclaim Screen",
+                sublabel = if (settings.reclaimScreenOnCarUi)
+                    "Return to the launcher when the car opens its own screen"
+                else
+                    "The car's own screen keeps the foreground when it opens",
+                icon     = Icons.Default.Home
+            ) {
+                Switch(
+                    checked         = settings.reclaimScreenOnCarUi,
+                    onCheckedChange = { onUpdate { copy(reclaimScreenOnCarUi = it) } },
+                    colors          = switchColors(accent)
+                )
+            }
+
+            SettingsDivider()
+
             val isMediaConnected by com.openlauncher.app.service.MediaListenerService.isConnected.collectAsState()
 
             // Bumped on ON_RESUME so statuses refresh when the user returns from
