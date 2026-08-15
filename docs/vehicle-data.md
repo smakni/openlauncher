@@ -103,7 +103,10 @@ which are three different faults that look identical on a blank widget.
 across every module and records a timeline. Arm a capture, perform one action,
 stop: whatever moved inside the window is the answer.
 
-Developer access on this unit: **8888** opens the CANbus menu.
+Factory menu on this unit: **3368**. Given by the owner, from the unit itself —
+an earlier revision of this file said 8888, which was recalled rather than
+checked and was wrong. Codes vary by manufacturer, model and firmware, so a code
+from anywhere but this unit is worth nothing.
 
 ---
 
