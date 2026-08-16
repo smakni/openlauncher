@@ -14,7 +14,7 @@ someone about to sit in the driver's seat and check.
 
 ---
 
-## 20260816-1339 — `pending`
+## 20260816-1339 — `fa1909d`
 
 **Fade everywhere, no sideways slide.** The launcher's own screen changes —
 home, apps, settings — now cross-fade instead of sliding in from the side. A
