@@ -55,7 +55,7 @@ ZHTD class among 10,108, confirmed by the `U_LANDROVER_*` constants it carries.
 | Low fuel warning | 163 | Arrives |
 | Handbrake, lights, indicators | 104, 98–101 | Arrive; not displayed |
 | **Fuel level** | **106** | **Always zero. See below** |
-| Volume | 137 | Never sent by this car |
+| Volume (car) | 137 | Not sent. Confirmed — see Closed |
 
 Ids below 256 are per-car, named by the decoder class. A second block from 1000
 up is common to every CAN box and carries capability flags plus a car-independent
@@ -117,10 +117,24 @@ from anywhere but this unit is worth nothing.
   by itself.
 - **Module 12 is the OBD module** and has never been opened. If a fuel level
   exists anywhere on this unit without a dongle, it is there.
-- **Volume.** Not on CAN. A candidate sits at module 4, id 2 — found by where it
-  appeared rather than by name, so it needs confirming by turning the knob.
 - **Reversing camera** black screen, likely a ZHTD protocol variant. AHD versus
   CVBS untested.
+
+---
+
+## Closed
+
+**Volume.** The head unit's own level is `U_VOL = 2` on the sound module, named
+from the vendor's `FinalSound` and confirmed on the car. The *car's* level,
+`U_CAR_VOL = 137`, is not sent — retested on a build where temperature, fuel and
+engine speed all arrive, so unlike the first attempt this is a real negative
+rather than the symptom of a broken subscription.
+
+It matters more than it looks, because this installation feeds the original
+audio system over AUX: what the driver hears is set by the car, and the unit's
+own volume is only the level going in. So the value that is readable is not the
+one worth showing, and the one worth showing is not on the bus. Dropped
+deliberately rather than left open.
 
 ---
 
