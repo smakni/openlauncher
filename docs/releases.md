@@ -4,13 +4,17 @@ One entry per build placed in `apk/`, newest first. Each names the APK, the
 commit it was built from, and what changed in terms of what the unit does —
 implementation detail belongs in the commit message.
 
+The hash is filled in after the commit exists, since a commit cannot contain its
+own. Amending to insert it changes the hash again, which is how the first attempt
+came out wrong.
+
 Builds are debug-signed and installed by hand on the unit. A build exists
 because something was worth testing in the car, so entries are written for
 someone about to sit in the driver's seat and check.
 
 ---
 
-## 20260816-1216 — `a216be2`
+## 20260816-1216 — `dcf3a4c`
 
 **Map zoom is a setting.** Settings › Map › *Map Zoom*, from z16 to z20. The
 default moves to z18: the tiles stop at z15, so past that it is the same
