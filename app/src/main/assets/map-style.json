@@ -54,7 +54,7 @@
       "layout": { "line-cap": "round", "line-join": "round" },
       "paint": {
         "line-color": "#333b46",
-        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 12, 1.2, 18, 11]
+        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 12, 1.6, 18, 15]
       }
     },
     {
@@ -66,7 +66,7 @@
       "layout": { "line-cap": "round", "line-join": "round" },
       "paint": {
         "line-color": "#454f5d",
-        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 10, 1.7, 18, 19]
+        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 10, 2.3, 18, 26]
       }
     },
     {
@@ -78,7 +78,7 @@
       "layout": { "line-cap": "round", "line-join": "round" },
       "paint": {
         "line-color": "#5b6675",
-        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 8, 2.1, 18, 26]
+        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 8, 2.9, 18, 35]
       }
     },
     {
@@ -90,7 +90,7 @@
       "layout": { "line-cap": "round", "line-join": "round" },
       "paint": {
         "line-color": "#7d8899",
-        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 6, 2.5, 18, 33]
+        "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 6, 3.4, 18, 44]
       }
     },
     {
@@ -110,12 +110,12 @@
         "symbol-placement": "line",
         "text-field": ["get", "name"],
         "text-font": ["Noto Sans Regular"],
-        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 13, 17, 17, 20, 20]
+        "text-size": ["interpolate", ["linear"], ["zoom"], 14, 16, 17, 21, 20, 25]
       },
       "paint": {
         "text-color": "#9aa4b2",
         "text-halo-color": "#12151a",
-        "text-halo-width": 1.8
+        "text-halo-width": 2.2
       }
     },
     {
@@ -126,12 +126,12 @@
       "layout": {
         "text-field": ["get", "name"],
         "text-font": ["Noto Sans Regular"],
-        "text-size": ["interpolate", ["linear"], ["zoom"], 6, 13, 14, 18, 20, 22]
+        "text-size": ["interpolate", ["linear"], ["zoom"], 6, 15, 14, 22, 20, 27]
       },
       "paint": {
         "text-color": "#c3cbd6",
         "text-halo-color": "#12151a",
-        "text-halo-width": 1.8
+        "text-halo-width": 2.2
       }
     }
   ]

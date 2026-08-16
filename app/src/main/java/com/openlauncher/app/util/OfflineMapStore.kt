@@ -218,7 +218,7 @@ object OfflineMapStore {
            "text-field": ["get", "name"],
            "text-padding": 6,
            "text-font": ["Noto Sans Regular"],
-           "text-size": ["interpolate", ["linear"], ["zoom"], 16, 12, 18, 15, 20, 18],
+           "text-size": ["interpolate", ["linear"], ["zoom"], 16, 15, 18, 19, 20, 23],
            "text-anchor": "top",
            "text-offset": [0, 0.6],
            "text-max-width": 8
@@ -226,7 +226,7 @@ object OfflineMapStore {
          "paint": {
            "text-color": "#a8b2c0",
            "text-halo-color": "#12151a",
-           "text-halo-width": 1.8
+           "text-halo-width": 2.2
          }}
     """
 

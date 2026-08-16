@@ -205,23 +205,6 @@ fun SettingsScreen(
 
             SettingsDivider()
 
-            SettingsRow(
-                label    = "Reclaim Screen",
-                sublabel = if (settings.reclaimScreenOnCarUi)
-                    "Return to the launcher when the car opens its own screen"
-                else
-                    "The car's own screen keeps the foreground when it opens",
-                icon     = Icons.Default.Home
-            ) {
-                Switch(
-                    checked         = settings.reclaimScreenOnCarUi,
-                    onCheckedChange = { onUpdate { copy(reclaimScreenOnCarUi = it) } },
-                    colors          = switchColors(accent)
-                )
-            }
-
-            SettingsDivider()
-
             val isMediaConnected by com.openlauncher.app.service.MediaListenerService.isConnected.collectAsState()
 
             // Bumped on ON_RESUME so statuses refresh when the user returns from
@@ -1061,6 +1044,34 @@ fun SettingsScreen(
                             selected = settings.offlineMapRadiusKm == km,
                             onClick  = { onUpdate { copy(offlineMapRadiusKm = km) } },
                             label    = { Text("$km km", fontSize = 9.sp, letterSpacing = 0.5.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accent,
+                                selectedLabelColor     = contrastOn(accent)
+                            )
+                        )
+                    }
+                }
+            }
+
+            SettingsDivider()
+
+            SettingsRow(
+                label    = "Map Zoom",
+                sublabel = when (settings.mapDefaultZoom) {
+                    16 -> "Wide — a district around the car"
+                    17 -> "Neighbourhood"
+                    18 -> "Streets around the car"
+                    19 -> "Close"
+                    else -> "Closest — little road visible ahead"
+                },
+                icon     = Icons.Default.ZoomIn
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(16, 17, 18, 19, 20).forEach { z ->
+                        FilterChip(
+                            selected = settings.mapDefaultZoom == z,
+                            onClick  = { onUpdate { copy(mapDefaultZoom = z) } },
+                            label    = { Text("z$z", fontSize = 9.sp, letterSpacing = 0.5.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = accent,
                                 selectedLabelColor     = contrastOn(accent)

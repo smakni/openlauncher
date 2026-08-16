@@ -165,10 +165,10 @@ data class AppSettings(
     // startup reads as broken rather than as pending.
     val lastAmbientTempC: Float = 0f,
     val lastAmbientTempAtMs: Long = 0L,
-    // Whether to come back to the front when the car opens its own screen.
-    // Off by default: it is a launcher taking the foreground from another app,
-    // which is worth doing only when it is what was asked for.
-    val reclaimScreenOnCarUi: Boolean = false
+    // How close the map sits when it is following the car. The tiles stop at
+    // fifteen, so past that is the same geometry drawn larger — closer is a
+    // preference about how much road to see ahead, not about detail.
+    val mapDefaultZoom: Int = 18
 )
 
 fun defaultShortcuts() = listOf(

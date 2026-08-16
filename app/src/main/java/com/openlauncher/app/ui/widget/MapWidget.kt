@@ -43,16 +43,18 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
 /**
- * Building scale.
+ * Where the camera sits before anything has said otherwise.
+ *
+ * Only a fallback now: the level in use comes from settings. Kept because the
+ * map has to open somewhere on the very first run, and because the holder's
+ * remembered zoom needs a value before a composition has supplied one.
  *
  * The tiles stop at zoom 15, so everything past it is overzoom — the same
  * geometry drawn larger. Vector data survives that where a raster tile would
  * blur, since the shapes are rendered rather than magnified, but no new detail
  * appears above 15 and labels thin out as they are spaced for a smaller scale.
- * Twenty is close, and close is what was asked for; it is worth knowing that the
- * gain over 18 is size rather than information.
  */
-private const val DEFAULT_ZOOM = 20.0
+private const val DEFAULT_ZOOM = 18.0
 
 /** The marker grows with the scale, between these bounds. */
 private val MARKER_MIN_DP = 12.dp
@@ -165,6 +167,8 @@ fun MapWidget(
     styleUri: String,
     hasMapData: Boolean,
     roadSnapMetres: Int = 0,
+    /** The level the camera follows at, from settings. */
+    defaultZoom: Double = DEFAULT_ZOOM,
     lastKnown: LatLng? = null,
     accent: Color,
     isDayMode: Boolean = false,
@@ -285,7 +289,7 @@ fun MapWidget(
 
         // Whatever level is in effect is kept, so following again after a pinch
         // does not snap back to the default.
-        val zoom = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: DEFAULT_ZOOM
+        val zoom = map.cameraPosition.zoom.takeIf { z -> z > 1.0 } ?: defaultZoom
 
         // Last line of defence. A non-finite coordinate reaching the renderer
         // kills the render thread outright rather than raising anything catchable
@@ -402,7 +406,7 @@ fun MapWidget(
                                 CameraUpdateFactory.newCameraPosition(
                                     CameraPosition.Builder()
                                         .target(lastKnown ?: LatLng(0.0, 0.0))
-                                        .zoom(DEFAULT_ZOOM)
+                                        .zoom(defaultZoom)
                                         .build()
                                 )
                             )

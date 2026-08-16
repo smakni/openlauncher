@@ -10,6 +10,23 @@ someone about to sit in the driver's seat and check.
 
 ---
 
+## 20260816-1216 — `a216be2`
+
+**Map zoom is a setting.** Settings › Map › *Map Zoom*, from z16 to z20. The
+default moves to z18: the tiles stop at z15, so past that it is the same
+geometry drawn larger, and the choice is really about how much road you want
+visible ahead.
+
+**Roads and labels larger again** — road widths up by about a third, street
+names, place names and POI names with them, and a wider halo behind the text.
+
+**Reclaim Screen removed.** It fought another application for the foreground
+and was never going to be clean. The cleaner routes are the factory menu
+(**3368**) if it offers an auto-display option, or disabling the single vendor
+activity over ADB.
+
+---
+
 ## 20260815-1838 — `00cbb08`
 
 **Take the screen back from the car's own UI.** Settings › Permissions ›

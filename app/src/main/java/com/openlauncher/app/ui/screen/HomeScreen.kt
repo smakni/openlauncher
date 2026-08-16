@@ -512,6 +512,7 @@ fun HomeScreen(
                             styleUri   = mapStyleUri,
                             hasMapData = hasMapData,
                             roadSnapMetres = settings.roadSnapMetres,
+                            defaultZoom = settings.mapDefaultZoom.toDouble(),
                             lastKnown = settings.lastLatitude
                                 .takeIf { it != 0.0 || settings.lastLongitude != 0.0 }
                                 ?.let {
