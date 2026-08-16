@@ -184,10 +184,8 @@ fun OnboardingScreen(
                 ) {
                     AnimatedContent(
                         targetState = currentStep,
-                        transitionSpec = {
-                            fadeIn() + slideInHorizontally { it / 5 } togetherWith
-                            fadeOut() + slideOutHorizontally { -it / 5 }
-                        },
+                        // Matches the rest of the launcher: fade only.
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
                         label = "step_transition"
                     ) { step ->
                         when (step) {

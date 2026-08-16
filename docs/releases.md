@@ -14,6 +14,20 @@ someone about to sit in the driver's seat and check.
 
 ---
 
+## 20260816-1339 — `pending`
+
+**Fade everywhere, no sideways slide.** The launcher's own screen changes —
+home, apps, settings — now cross-fade instead of sliding in from the side. A
+slide implies one screen sits to the left of another, which is not true of panes
+with no order, and it read as movement inside a vehicle already moving.
+
+*Not included, and not possible from here:* the sideways slide when reverse is
+engaged belongs to the vendor's own reversing activity opening over the
+launcher. Android takes that animation from the application being opened, so
+nothing in this app can replace it. Turning off *Transition animation scale* in
+Android's developer options removes it — along with every other animation,
+including the fade.
+
 ## 20260816-1216 — `dcf3a4c`
 
 **Map zoom is a setting.** Settings › Map › *Map Zoom*, from z16 to z20. The

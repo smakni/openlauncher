@@ -210,10 +210,13 @@ class MainActivity : ComponentActivity() {
                             // ── Main content pane ─────────────────────────────
                             AnimatedContent(
                                 targetState   = nav,
-                                transitionSpec = {
-                                    fadeIn() + slideInHorizontally { it / 10 } togetherWith
-                                    fadeOut() + slideOutHorizontally { -it / 10 }
-                                },
+                                // A fade and nothing else. The sideways slide
+                                // implied a direction — that one screen sits to
+                                // the left of another — which is not true of a
+                                // launcher whose panes have no order, and it read
+                                // as movement in a vehicle that was already
+                                // moving.
+                                transitionSpec = { fadeIn() togetherWith fadeOut() },
                                 modifier = paneModifier,
                                 label    = "pane_transition"
                             ) { destination ->
